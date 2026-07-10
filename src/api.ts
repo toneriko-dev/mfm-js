@@ -1,6 +1,6 @@
 import { fullParser, simpleParser } from './internal';
 import { inspectOne, stringifyNode, stringifyTree } from './internal/util';
-import { MfmNode, MfmSimpleNode } from './node';
+import { MfmMention, MfmNode, MfmSimpleNode } from './node';
 
 /**
  * Generates a MfmNode tree from the MFM string.
@@ -62,4 +62,25 @@ export function extract(nodes: MfmNode[], predicate: (node: MfmNode) => boolean)
 	});
 
 	return dest;
+}
+
+/**
+ * Extracts unique mentions while preserving their first appearance order.
+ * Usernames and hostnames are compared case-insensitively.
+ */
+export function extractMentions(nodes: MfmNode[]): MfmMention['props'][] {
+	const mentions: MfmMention['props'][] = [];
+	const seen = new Set<string>();
+
+	inspect(nodes, (node) => {
+		if (node.type !== 'mention') return;
+
+		const key = `${node.props.username.toLowerCase()}@${node.props.host?.toLowerCase() ?? ''}`;
+		if (seen.has(key)) return;
+
+		seen.add(key);
+		mentions.push(node.props);
+	});
+
+	return mentions;
 }

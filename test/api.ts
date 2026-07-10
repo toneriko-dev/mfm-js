@@ -228,4 +228,27 @@ after`;
 			);
 		});
 	});
+
+	describe('extractMentions', () => {
+		test('deduplicates accounts case-insensitively and preserves order', () => {
+			const nodes = mfm.parse('@Foo @bar@example.com **@foo** @BAR@EXAMPLE.COM @bar@other.example');
+			assert.deepStrictEqual(mfm.extractMentions(nodes), [
+				{
+					username: 'Foo',
+					host: null,
+					acct: '@Foo',
+				},
+				{
+					username: 'bar',
+					host: 'example.com',
+					acct: '@bar@example.com',
+				},
+				{
+					username: 'bar',
+					host: 'other.example',
+					acct: '@bar@other.example',
+				},
+			]);
+		});
+	});
 });

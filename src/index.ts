@@ -1,4 +1,4 @@
-export { parse, parseSimple, toString, inspect, extract } from './api';
+export { parse, parseSimple, toString, inspect, extract, extractMentions } from './api';
 
 export type { NodeType, MfmNode, MfmSimpleNode, MfmBlock, MfmInline } from './node';
 
