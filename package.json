@@ -1,0 +1,37 @@
+{
+	"type": "module",
+	"name": "mfm-js",
+	"version": "0.26.0",
+	"description": "MFM parser implementation (Misskey fork)",
+	"author": "Marihachi",
+	"license": "MIT",
+	"private": true,
+	"homepage": "https://github.com/misskey-dev/mfm.js",
+	"exports": {
+		".": {
+			"import": "./built/index.js",
+			"types": "./built/index.d.ts",
+			"default": "./built/index.js"
+		}
+	},
+	"scripts": {
+		"build": "bun ./build.js",
+		"watch": "bun ./build.js --watch",
+		"typecheck": "tsgo --noEmit",
+		"lint": "bun run --bun typecheck",
+		"test": "vitest run"
+	},
+	"dependencies": {
+		"@misskey-dev/emoji-data": "17.0.6"
+	},
+	"devDependencies": {
+		"@microsoft/api-extractor": "7.58.9",
+		"@types/node": "26.0.0",
+		"esbuild": "0.28.1",
+		"execa": "9.6.1",
+		"vitest": "4.1.9"
+	},
+	"files": [
+		"built"
+	]
+}
