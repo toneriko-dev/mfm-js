@@ -90,6 +90,9 @@ export class Parser<T> {
 				if (!result.success) {
 					break;
 				}
+				if (result.index <= latestIndex) {
+					throw new Error('A parser passed to many() must consume at least one character on success.');
+				}
 				latestIndex = result.index;
 				accum.push(result.value);
 			}
