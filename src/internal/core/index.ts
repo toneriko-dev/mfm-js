@@ -56,7 +56,7 @@ export class Parser<T> {
 			}
 			return handler(input, index, state);
 		};
-		this.name = name;
+		if (name !== undefined) this.name = name;
 	}
 
 	map<U>(fn: (value: T) => U): Parser<U> {
@@ -161,8 +161,8 @@ export function seq<Parsers extends Parser<unknown>[]>(...parsers: Parsers): Par
 		let result;
 		let latestIndex = index;
 		const accum = [];
-		for (let i = 0; i < parsers.length; i++) {
-			result = parsers[i].handler(input, latestIndex, state);
+		for (const parser of parsers) {
+			result = parser.handler(input, latestIndex, state);
 			if (!result.success) {
 				return result;
 			}
@@ -175,8 +175,7 @@ export function seq<Parsers extends Parser<unknown>[]>(...parsers: Parsers): Par
 
 export function alt<Parsers extends Parser<unknown>[]>(parsers: Parsers): Parser<ParsedType<Parsers[number]>> {
 	return new Parser<ParsedType<Parsers[number]>>((input, index, state): Result<ParsedType<Parsers[number]>> => {
-		for (let i = 0; i < parsers.length; i++) {
-			const parser: Parsers[number] = parsers[i];
+		for (const parser of parsers) {
 			const result = parser.handler(input, index, state);
 			if (result.success) {
 				return result as Result<ParsedType<Parsers[number]>>;

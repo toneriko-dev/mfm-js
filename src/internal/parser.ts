@@ -19,8 +19,8 @@ function seqOrText<Parsers extends P.Parser<unknown>[]>(
 		// TODO: typesafe implementation
 		const accum: unknown[] = [];
 		let latestIndex = index;
-		for (let i = 0; i < parsers.length; i++) {
-			const result = parsers[i].handler(input, latestIndex, state);
+		for (const parser of parsers) {
+			const result = parser.handler(input, latestIndex, state);
 			if (!result.success) {
 				if (latestIndex === index) {
 					return P.failure();
@@ -239,7 +239,7 @@ export const language = P.createLanguage<TypeTable>({
 			const contents = result.value;
 			const quoteIndex = result.index;
 			// disallow empty content if single line
-			if (contents.length === 1 && contents[0].length === 0) {
+			if (contents.length === 1 && contents[0] === '') {
 				return P.failure();
 			}
 			// parse inner content

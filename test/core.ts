@@ -7,10 +7,12 @@ describe('Parser combinators', () => {
 			const zeroWidthParser = new Parser((_input, index) => success(index, null));
 			const parser = zeroWidthParser.many(0);
 
-			expect(() => parser.handler('x', 0, {
-				depth: 0,
-				nestLimit: 20,
-			})).toThrow('must consume at least one character');
+			expect(() =>
+				parser.handler('x', 0, {
+					depth: 0,
+					nestLimit: 20,
+				}),
+			).toThrow('must consume at least one character');
 		});
 	});
 });

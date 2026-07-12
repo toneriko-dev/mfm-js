@@ -6,9 +6,14 @@ import { MfmMention, MfmNode, MfmSimpleNode } from './node';
  * Generates a MfmNode tree from the MFM string.
  */
 export function parse(input: string, opts: Partial<{ nestLimit: number }> = {}): MfmNode[] {
-	const nodes = fullParser(input, {
-		nestLimit: opts.nestLimit,
-	});
+	const nodes = fullParser(
+		input,
+		opts.nestLimit === undefined
+			? {}
+			: {
+					nestLimit: opts.nestLimit,
+				},
+	);
 	return nodes;
 }
 
