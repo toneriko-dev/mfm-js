@@ -89,6 +89,7 @@ interface TypeTable {
 	text: string;
 }
 
+// P.altは最初にmatchしたparserを採用するため、各配列の順序は構文の優先順位を表す。
 export const language = P.createLanguage<TypeTable>({
 	fullParser: (r) => {
 		return r.full.many(0);
@@ -100,57 +101,31 @@ export const language = P.createLanguage<TypeTable>({
 
 	full: (r) => {
 		return P.alt([
-			// Regexp
 			r.unicodeEmoji,
-			// "<center>" block
 			r.centerTag,
-			// "<small>"
 			r.smallTag,
-			// "<plain>"
 			r.plainTag,
-			// "<b>"
 			r.boldTag,
-			// "<i>"
 			r.italicTag,
-			// "<s>"
 			r.strikeTag,
-			// "<http"
 			r.urlAlt,
-			// "***"
 			r.big,
-			// "**"
 			r.boldAsta,
-			// "*"
 			r.italicAsta,
-			// "__"
 			r.boldUnder,
-			// "_"
 			r.italicUnder,
-			// "```" block
 			r.codeBlock,
-			// "`"
 			r.inlineCode,
-			// ">" block
 			r.quote,
-			// "\\[" block
 			r.mathBlock,
-			// "\\("
 			r.mathInline,
-			// "~~"
 			r.strikeWave,
-			// "$[""
 			r.fn,
-			// "@"
 			r.mention,
-			// "#"
 			r.hashtag,
-			// ":"
 			r.emojiCode,
-			// "?[" or "["
 			r.link,
-			// http
 			r.url,
-			// block
 			r.search,
 			r.text,
 		]);
@@ -167,47 +142,26 @@ export const language = P.createLanguage<TypeTable>({
 
 	inline: (r) => {
 		return P.alt([
-			// Regexp
 			r.unicodeEmoji,
-			// "<small>"
 			r.smallTag,
-			// "<plain>"
 			r.plainTag,
-			// "<b>"
 			r.boldTag,
-			// "<i>"
 			r.italicTag,
-			// "<s>"
 			r.strikeTag,
-			// <http
 			r.urlAlt,
-			// "***"
 			r.big,
-			// "**"
 			r.boldAsta,
-			// "*"
 			r.italicAsta,
-			// "__"
 			r.boldUnder,
-			// "_"
 			r.italicUnder,
-			// "`"
 			r.inlineCode,
-			// "\\("
 			r.mathInline,
-			// "~~"
 			r.strikeWave,
-			// "$[""
 			r.fn,
-			// "@"
 			r.mention,
-			// "#"
 			r.hashtag,
-			// ":"
 			r.emojiCode,
-			// "?[" or "["
 			r.link,
-			// http
 			r.url,
 			r.text,
 		]);

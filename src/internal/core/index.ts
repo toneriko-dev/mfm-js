@@ -241,13 +241,9 @@ export function lazy<T>(fn: () => Parser<T>): Parser<T> {
 	return parser;
 }
 
-//type Syntax<T> = (rules: Record<string, Parser<T>>) => Parser<T>;
-//type SyntaxReturn<T> = T extends (rules: Record<string, Parser<any>>) => infer R ? R : never;
-//export function createLanguage2<T extends Record<string, Syntax<any>>>(syntaxes: T): { [K in keyof T]: SyntaxReturn<T[K]> } {
-
 type ParserTable<T> = { [K in keyof T]: Parser<T[K]> };
 
-// TODO: 関数の型宣言をいい感じにしたい
+// rule同士が相互参照できるよう、各parserは初回利用時まで遅延初期化する。
 export function createLanguage<T>(syntaxes: { [K in keyof T]: (r: ParserTable<T>) => Parser<T[K]> }): ParserTable<T> {
 	// @ts-expect-error initializing object so type error here
 	const rules: ParserTable<T> = {};
