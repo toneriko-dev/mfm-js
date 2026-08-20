@@ -2,9 +2,6 @@ import { fullParser, simpleParser } from './internal';
 import { inspectOne, stringifyNode, stringifyTree } from './internal/util';
 import { MfmMention, MfmNode, MfmSimpleNode } from './node';
 
-/**
- * Generates a MfmNode tree from the MFM string.
- */
 export function parse(input: string, opts: Partial<{ nestLimit: number }> = {}): MfmNode[] {
 	const nodes = fullParser(
 		input,
@@ -17,17 +14,11 @@ export function parse(input: string, opts: Partial<{ nestLimit: number }> = {}):
 	return nodes;
 }
 
-/**
- * Generates a MfmSimpleNode tree from the MFM string.
- */
 export function parseSimple(input: string): MfmSimpleNode[] {
 	const nodes = simpleParser(input);
 	return nodes;
 }
 
-/**
- * Generates a MFM string from the MfmNode tree.
- */
 export function toString(tree: MfmNode[]): string;
 export function toString(node: MfmNode): string;
 export function toString(node: MfmNode | MfmNode[]): string {
@@ -38,9 +29,6 @@ export function toString(node: MfmNode | MfmNode[]): string {
 	}
 }
 
-/**
- * Inspects the MfmNode tree.
- */
 export function inspect(node: MfmNode, action: (node: MfmNode) => void): void;
 export function inspect(nodes: MfmNode[], action: (node: MfmNode) => void): void;
 export function inspect(node: MfmNode | MfmNode[], action: (node: MfmNode) => void): void {
@@ -53,10 +41,6 @@ export function inspect(node: MfmNode | MfmNode[], action: (node: MfmNode) => vo
 	}
 }
 
-/**
- * Inspects the MfmNode tree and returns as an array the nodes that match the conditions
- * of the predicate function.
- */
 export function extract(nodes: MfmNode[], predicate: (node: MfmNode) => boolean): MfmNode[] {
 	const dest = [] as MfmNode[];
 
@@ -69,10 +53,7 @@ export function extract(nodes: MfmNode[], predicate: (node: MfmNode) => boolean)
 	return dest;
 }
 
-/**
- * Extracts unique mentions while preserving their first appearance order.
- * Usernames and hostnames are compared case-insensitively.
- */
+/** メンションを重複除去し、初出順で返す。ユーザー名とホスト名は大文字小文字を区別しない。 */
 export function extractMentions(nodes: MfmNode[]): MfmMention['props'][] {
 	const mentions: MfmMention['props'][] = [];
 	const seen = new Set<string>();

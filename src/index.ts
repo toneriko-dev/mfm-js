@@ -3,14 +3,11 @@ export { parse, parseSimple, toString, inspect, extract, extractMentions } from 
 export type { NodeType, MfmNode, MfmSimpleNode, MfmBlock, MfmInline } from './node';
 
 export type {
-	// block
 	MfmQuote,
 	MfmSearch,
 	MfmCodeBlock,
 	MfmMathBlock,
 	MfmCenter,
-
-	// inline
 	MfmUnicodeEmoji,
 	MfmEmojiCode,
 	MfmBold,
@@ -29,14 +26,11 @@ export type {
 } from './node';
 
 export {
-	// block
 	QUOTE,
 	SEARCH,
 	CODE_BLOCK,
 	MATH_BLOCK,
 	CENTER,
-
-	// inline
 	UNI_EMOJI,
 	EMOJI_CODE,
 	BOLD,
@@ -52,7 +46,5 @@ export {
 	FN,
 	PLAIN,
 	TEXT,
-
-	// util
 	isMfmBlock,
 } from './node';

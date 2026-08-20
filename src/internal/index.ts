@@ -20,7 +20,7 @@ export function fullParser(input: string, opts: FullParserOpts): M.MfmNode[] {
 export function simpleParser(input: string): M.MfmSimpleNode[] {
 	const result = language.simpleParser.handler(input, 0, {
 		depth: 0,
-		nestLimit: 1 / 0, // reliable infinite
+		nestLimit: 1 / 0, // 入れ子の深さを制限しない
 	});
 	if (!result.success) throw new Error('Unexpected parse error');
 	return mergeText(result.value);

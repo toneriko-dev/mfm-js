@@ -1,7 +1,3 @@
-//
-// Parsimmon-like stateful parser combinators
-//
-
 export type Success<T> = {
 	success: true;
 	value: T;
@@ -242,7 +238,7 @@ export function lazy<T>(fn: () => Parser<T>): Parser<T> {
 
 type ParserTable<T> = { [K in keyof T]: Parser<T[K]> };
 
-// rule同士が相互参照できるよう、各parserは初回利用時まで遅延初期化する。
+// 構文規則の相互参照を可能にするため、parser は初回利用時まで遅延初期化する。
 export function createLanguage<T>(syntaxes: { [K in keyof T]: (r: ParserTable<T>) => Parser<T[K]> }): ParserTable<T> {
 	// @ts-expect-error initializing object so type error here
 	const rules: ParserTable<T> = {};

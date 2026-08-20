@@ -16,7 +16,6 @@ function seqOrText<Parsers extends P.Parser<unknown>[]>(
 	...parsers: Parsers
 ): P.Parser<SeqParseResult<Parsers> | string> {
 	return new P.Parser<SeqParseResult<Parsers> | string>((input, index, state) => {
-		// TODO: typesafe implementation
 		const accum: unknown[] = [];
 		let latestIndex = index;
 		for (const parser of parsers) {
@@ -44,7 +43,7 @@ const nestable = new P.Parser((_input, index, state) => {
 });
 
 function nest<T>(parser: P.Parser<T>, fallback?: P.Parser<string>): P.Parser<T | string> {
-	// nesting limited? -> No: specified parser, Yes: fallback parser (default = P.char)
+	// 入れ子制限内では指定 parser を使い、超過時は fallback（未指定時は1文字）を使う。
 	const inner = P.alt([P.seq(nestable, parser).select(1), fallback != null ? fallback : P.char]);
 	return new P.Parser<T | string>((input, index, state) => {
 		state.depth++;
@@ -132,12 +131,7 @@ export const language = P.createLanguage<TypeTable>({
 	},
 
 	simple: (r) => {
-		return P.alt([
-			r.unicodeEmoji, // Regexp
-			r.emojiCode, // ":"
-			r.plainTag, // "<plain>" // to NOT parse emojiCode inside `<plain>`
-			r.text,
-		]);
+		return P.alt([r.unicodeEmoji, r.emojiCode, r.plainTag, r.text]);
 	},
 
 	inline: (r) => {
@@ -185,18 +179,15 @@ export const language = P.createLanguage<TypeTable>({
 		).select(3);
 		return new P.Parser((input, index, state) => {
 			let result;
-			// parse quote
 			result = parser.handler(input, index, state);
 			if (!result.success) {
 				return result;
 			}
 			const contents = result.value;
 			const quoteIndex = result.index;
-			// disallow empty content if single line
 			if (contents.length === 1 && contents[0] === '') {
 				return P.failure();
 			}
-			// parse inner content
 			const contentParser = nest(r.fullParser).many(0);
 			result = contentParser.handler(contents.join('\n'), 0, state);
 			if (!result.success) {
@@ -325,7 +316,6 @@ export const language = P.createLanguage<TypeTable>({
 			if (!result.success) {
 				return P.failure();
 			}
-			// check before
 			const beforeStr = input.slice(0, index);
 			if (/[a-z0-9]$/i.test(beforeStr)) {
 				return P.failure();
@@ -342,7 +332,6 @@ export const language = P.createLanguage<TypeTable>({
 			if (!result.success) {
 				return P.failure();
 			}
-			// check before
 			const beforeStr = input.slice(0, index);
 			if (/[a-z0-9]$/i.test(beforeStr)) {
 				return P.failure();
@@ -377,7 +366,7 @@ export const language = P.createLanguage<TypeTable>({
 	unicodeEmoji: () => {
 		const emoji = RegExp(emojiRegex.source);
 		return P.regexp(emoji).map((content) => {
-			// 異体字セレクタ(U+FE0F)の場合は文字として返す
+			// 異体字セレクタ（U+FE0F）は絵文字ノードにせず文字として扱う。
 			return content === '\uFE0F' ? content : M.UNI_EMOJI(content);
 		});
 	},
@@ -482,7 +471,6 @@ export const language = P.createLanguage<TypeTable>({
 			if (!result.success) {
 				return P.failure();
 			}
-			// check before (not mention)
 			const beforeStr = input.slice(0, index);
 			if (/[a-z0-9]$/i.test(beforeStr)) {
 				return P.failure();
@@ -491,39 +479,32 @@ export const language = P.createLanguage<TypeTable>({
 			const resultIndex = result.index;
 			const username: string = result.value[2];
 			const hostname: string | null = result.value[3];
-			// remove [.-] of tail of hostname
 			let modifiedHost = hostname;
 			if (hostname != null) {
 				result = /[.-]+$/.exec(hostname);
 				if (result != null) {
 					modifiedHost = hostname.slice(0, -1 * result[0].length);
 					if (modifiedHost.length === 0) {
-						// disallow invalid char only hostname
 						invalidMention = true;
 						modifiedHost = null;
 					}
 				}
 			}
-			// remove [.-] of tail of username
 			let modifiedName = username;
 			result = /[.-]+$/.exec(username);
 			if (result != null) {
 				if (modifiedHost == null) {
 					modifiedName = username.slice(0, -1 * result[0].length);
 				} else {
-					// cannnot to remove tail of username if exist hostname
 					invalidMention = true;
 				}
 			}
-			// disallow [.-] of head of username
 			if (modifiedName.length === 0 || /^[.-]/.test(modifiedName)) {
 				invalidMention = true;
 			}
-			// disallow [.-] of head of hostname
 			if (modifiedHost != null && /^[.-]/.test(modifiedHost)) {
 				invalidMention = true;
 			}
-			// generate a text if mention is invalid
 			if (invalidMention) {
 				return P.success(resultIndex, input.slice(index, resultIndex));
 			}
@@ -553,14 +534,12 @@ export const language = P.createLanguage<TypeTable>({
 			if (!result.success) {
 				return P.failure();
 			}
-			// check before
 			const beforeStr = input.slice(0, index);
 			if (/[a-z0-9]$/i.test(beforeStr)) {
 				return P.failure();
 			}
 			const resultIndex = result.index;
 			const resultValue = result.value;
-			// disallow number only
 			if (/^[0-9]+$/.test(resultValue)) {
 				return P.failure();
 			}
@@ -630,7 +609,6 @@ export const language = P.createLanguage<TypeTable>({
 			let modifiedIndex = resultIndex;
 			const schema: string = result.value[1];
 			let content: string = result.value[2];
-			// remove the ".," at the right end
 			result = /[.,]+$/.exec(content);
 			if (result != null) {
 				modifiedIndex -= result[0].length;

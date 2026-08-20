@@ -8,9 +8,6 @@ export function mergeText<T extends MfmNode>(
 	const dest: (T | MfmText)[] = [];
 	const storedChars: string[] = [];
 
-	/**
-	 * Generate a text node from the stored chars, And push it.
-	 */
 	function generateText(): void {
 		if (storedChars.length > 0) {
 			dest.push(TEXT(storedChars.join('')));
@@ -21,7 +18,6 @@ export function mergeText<T extends MfmNode>(
 	const flatten = nodes.flat(1) as (string | T)[];
 	for (const node of flatten) {
 		if (typeof node === 'string') {
-			// Store the char.
 			storedChars.push(node);
 		} else if (!Array.isArray(node) && node.type === 'text') {
 			storedChars.push((node as MfmText).props.text);
@@ -37,7 +33,6 @@ export function mergeText<T extends MfmNode>(
 
 export function stringifyNode(node: MfmNode): string {
 	switch (node.type) {
-		// block
 		case 'quote': {
 			return stringifyTree(node.children)
 				.split('\n')
@@ -56,7 +51,6 @@ export function stringifyNode(node: MfmNode): string {
 		case 'center': {
 			return `<center>\n${stringifyTree(node.children)}\n</center>`;
 		}
-		// inline
 		case 'emojiCode': {
 			return `:${node.props.name}:`;
 		}
@@ -131,14 +125,7 @@ export function stringifyTree(nodes: MfmNode[]): string {
 	let state: StringifyState = StringifyState.none;
 
 	for (const node of nodes) {
-		// 文脈に合わせて改行を追加する。
-		// none -> inline   : No
-		// none -> block    : No
-		// inline -> inline : No
-		// inline -> block  : Yes
-		// block -> inline  : Yes
-		// block -> block   : Yes
-
+		// 初回を除き、前後のいずれかがブロックの場合に改行を挿入する。
 		let pushLf = true;
 		if (isMfmBlock(node)) {
 			if (state === StringifyState.none) {
