@@ -1,6 +1,6 @@
 import { rm } from 'node:fs/promises';
 import { build, context } from 'esbuild';
-import { execa } from 'execa';
+import { spawnChecked } from '../../scripts/spawn-checked.mjs';
 
 const watch = process.argv.includes('--watch');
 const options = {
@@ -15,30 +15,21 @@ const options = {
 };
 
 async function buildTypes() {
-	await execa(
-		'bun',
-		[
-			'run',
-			'--bun',
-			'tsgo',
-			'--project',
-			'tsconfig.json',
-			'--outDir',
-			'built',
-			'--declaration',
-			'true',
-			'--emitDeclarationOnly',
-			'true',
-		],
-		{
-			stdout: process.stdout,
-			stderr: process.stderr,
-		},
-	);
-	await execa('bun', ['run', '--bun', 'api-extractor', 'run', '--local'], {
-		stdout: process.stdout,
-		stderr: process.stderr,
-	});
+	await spawnChecked([
+		process.execPath,
+		'run',
+		'--bun',
+		'tsgo',
+		'--project',
+		'tsconfig.json',
+		'--outDir',
+		'built',
+		'--declaration',
+		'true',
+		'--emitDeclarationOnly',
+		'true',
+	]);
+	await spawnChecked([process.execPath, 'run', '--bun', 'api-extractor', 'run', '--local']);
 }
 
 if (!watch) {
