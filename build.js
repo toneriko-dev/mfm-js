@@ -1,6 +1,9 @@
 import { rm } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
 import { build, context } from 'esbuild';
 import { spawnChecked } from '../../scripts/spawn-checked.mjs';
+
+const tscNative = fileURLToPath(new URL('../../scripts/tsc-native.mjs', import.meta.url));
 
 const watch = process.argv.includes('--watch');
 const options = {
@@ -19,7 +22,7 @@ async function buildTypes() {
 		process.execPath,
 		'run',
 		'--bun',
-		'tsgo',
+		tscNative,
 		'--project',
 		'tsconfig.json',
 		'--outDir',
