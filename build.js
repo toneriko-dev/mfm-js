@@ -47,7 +47,9 @@ if (!watch) {
 				name: 'generate-types',
 				setup(build) {
 					build.onEnd(async (result) => {
-						if (result.errors.length === 0) await buildTypes();
+						if (result.errors.length === 0) {
+							await buildTypes();
+						}
 					});
 				},
 			},

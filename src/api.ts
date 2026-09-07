@@ -24,9 +24,8 @@ export function toString(node: MfmNode): string;
 export function toString(node: MfmNode | MfmNode[]): string {
 	if (Array.isArray(node)) {
 		return stringifyTree(node);
-	} else {
-		return stringifyNode(node);
 	}
+	return stringifyNode(node);
 }
 
 export function inspect(node: MfmNode, action: (node: MfmNode) => void): void;
@@ -59,10 +58,14 @@ export function extractMentions(nodes: MfmNode[]): MfmMention['props'][] {
 	const seen = new Set<string>();
 
 	inspect(nodes, (node) => {
-		if (node.type !== 'mention') return;
+		if (node.type !== 'mention') {
+			return;
+		}
 
 		const key = `${node.props.username.toLowerCase()}@${node.props.host?.toLowerCase() ?? ''}`;
-		if (seen.has(key)) return;
+		if (seen.has(key)) {
+			return;
+		}
 
 		seen.add(key);
 		mentions.push(node.props);

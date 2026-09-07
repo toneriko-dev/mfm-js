@@ -1,6 +1,6 @@
 import { emojiRegex } from '@misskey-dev/emoji-data';
 
-import * as M from '..';
+import * as M from '../node';
 import * as P from './core';
 import { mergeText } from './util';
 import { SeqParseResult } from './core';
@@ -23,9 +23,8 @@ function seqOrText<Parsers extends P.Parser<unknown>[]>(
 			if (!result.success) {
 				if (latestIndex === index) {
 					return P.failure();
-				} else {
-					return P.success(latestIndex, input.slice(index, latestIndex));
 				}
+				return P.success(latestIndex, input.slice(index, latestIndex));
 			}
 			accum.push(result.value);
 			latestIndex = result.index;
@@ -263,7 +262,9 @@ export const language = P.createLanguage<TypeTable>({
 	big: (r) => {
 		const mark = P.str('***');
 		return seqOrText(mark, P.seq(P.notMatch(mark), nest(r.inline)).select(1).many(1), mark).map((result) => {
-			if (typeof result === 'string') return result;
+			if (typeof result === 'string') {
+				return result;
+			}
 			return M.FN('tada', {}, mergeText(result[1]));
 		});
 	},
@@ -271,7 +272,9 @@ export const language = P.createLanguage<TypeTable>({
 	boldAsta: (r) => {
 		const mark = P.str('**');
 		return seqOrText(mark, P.seq(P.notMatch(mark), nest(r.inline)).select(1).many(1), mark).map((result) => {
-			if (typeof result === 'string') return result;
+			if (typeof result === 'string') {
+				return result;
+			}
 			return M.BOLD(mergeText(result[1]));
 		});
 	},
@@ -280,7 +283,9 @@ export const language = P.createLanguage<TypeTable>({
 		const open = P.str('<b>');
 		const close = P.str('</b>');
 		return seqOrText(open, P.seq(P.notMatch(close), nest(r.inline)).select(1).many(1), close).map((result) => {
-			if (typeof result === 'string') return result;
+			if (typeof result === 'string') {
+				return result;
+			}
 			return M.BOLD(mergeText(result[1]));
 		});
 	},
@@ -294,7 +299,9 @@ export const language = P.createLanguage<TypeTable>({
 		const open = P.str('<small>');
 		const close = P.str('</small>');
 		return seqOrText(open, P.seq(P.notMatch(close), nest(r.inline)).select(1).many(1), close).map((result) => {
-			if (typeof result === 'string') return result;
+			if (typeof result === 'string') {
+				return result;
+			}
 			return M.SMALL(mergeText(result[1]));
 		});
 	},
@@ -303,7 +310,9 @@ export const language = P.createLanguage<TypeTable>({
 		const open = P.str('<i>');
 		const close = P.str('</i>');
 		return seqOrText(open, P.seq(P.notMatch(close), nest(r.inline)).select(1).many(1), close).map((result) => {
-			if (typeof result === 'string') return result;
+			if (typeof result === 'string') {
+				return result;
+			}
 			return M.ITALIC(mergeText(result[1]));
 		});
 	},
@@ -344,7 +353,9 @@ export const language = P.createLanguage<TypeTable>({
 		const open = P.str('<s>');
 		const close = P.str('</s>');
 		return seqOrText(open, P.seq(P.notMatch(close), nest(r.inline)).select(1).many(1), close).map((result) => {
-			if (typeof result === 'string') return result;
+			if (typeof result === 'string') {
+				return result;
+			}
 			return M.STRIKE(mergeText(result[1]));
 		});
 	},
@@ -358,7 +369,9 @@ export const language = P.createLanguage<TypeTable>({
 				.many(1),
 			mark,
 		).map((result) => {
-			if (typeof result === 'string') return result;
+			if (typeof result === 'string') {
+				return result;
+			}
 			return M.STRIKE(mergeText(result[1]));
 		});
 	},
@@ -425,7 +438,9 @@ export const language = P.createLanguage<TypeTable>({
 			P.seq(P.notMatch(fnClose), nest(r.inline)).select(1).many(1),
 			fnClose,
 		).map((result) => {
-			if (typeof result === 'string') return result;
+			if (typeof result === 'string') {
+				return result;
+			}
 			const name = result[1];
 			const args: Args = result[2] || {};
 			const content = result[4];
@@ -583,7 +598,9 @@ export const language = P.createLanguage<TypeTable>({
 			const [, prefix, label, , , url] = result.value;
 
 			const silent = prefix === '?[';
-			if (typeof url === 'string') return P.failure();
+			if (typeof url === 'string') {
+				return P.failure();
+			}
 
 			return P.success(result.index, M.LINK(silent, url.props.url, mergeText(label)));
 		});

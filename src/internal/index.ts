@@ -1,4 +1,4 @@
-import * as M from '..';
+import type * as M from '../node';
 import { language } from './parser';
 import { mergeText } from './util';
 
@@ -13,7 +13,9 @@ export function fullParser(input: string, opts: FullParserOpts): M.MfmNode[] {
 		linkLabel: false,
 		trace: false,
 	});
-	if (!result.success) throw new Error('Unexpected parse error');
+	if (!result.success) {
+		throw new Error('Unexpected parse error');
+	}
 	return mergeText(result.value);
 }
 
@@ -22,6 +24,8 @@ export function simpleParser(input: string): M.MfmSimpleNode[] {
 		depth: 0,
 		nestLimit: 1 / 0, // 入れ子の深さを制限しない
 	});
-	if (!result.success) throw new Error('Unexpected parse error');
+	if (!result.success) {
+		throw new Error('Unexpected parse error');
+	}
 	return mergeText(result.value);
 }

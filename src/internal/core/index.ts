@@ -52,7 +52,9 @@ export class Parser<T> {
 			}
 			return handler(input, index, state);
 		};
-		if (name !== undefined) this.name = name;
+		if (name !== undefined) {
+			this.name = name;
+		}
 	}
 
 	map<U>(fn: (value: T) => U): Parser<U> {

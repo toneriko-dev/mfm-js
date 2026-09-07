@@ -1,6 +1,6 @@
 import { isMfmBlock, MfmInline, MfmNode, MfmText, TEXT } from '../node';
 
-type ArrayRecursive<T> = T | Array<ArrayRecursive<T>>;
+type ArrayRecursive<T> = T | ArrayRecursive<T>[];
 
 export function mergeText<T extends MfmNode>(
 	nodes: ArrayRecursive<(T extends MfmInline ? MfmInline : MfmNode) | string>[],
@@ -84,9 +84,8 @@ export function stringifyNode(node: MfmNode): string {
 		case 'url': {
 			if (node.props.brackets) {
 				return `<${node.props.url}>`;
-			} else {
-				return node.props.url;
 			}
+			return node.props.url;
 		}
 		case 'link': {
 			const prefix = node.props.silent ? '?' : '';
@@ -97,9 +96,8 @@ export function stringifyNode(node: MfmNode): string {
 				const value = node.props.args[key];
 				if (value === true) {
 					return key;
-				} else {
-					return `${key}=${value}`;
 				}
+				return `${key}=${value}`;
 			});
 			const args = argFields.length > 0 ? '.' + argFields.join(',') : '';
 			return `$[${node.props.name}${args} ${stringifyTree(node.children)}]`;

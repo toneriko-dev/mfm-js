@@ -193,7 +193,9 @@ export type MfmUrl = {
 };
 export const N_URL = (value: string, brackets?: boolean): NodeType<'url'> => {
 	const node: MfmUrl = { type: 'url', props: { url: value } };
-	if (brackets) node.props.brackets = brackets;
+	if (brackets) {
+		node.props.brackets = brackets;
+	}
 	return node;
 };
 
