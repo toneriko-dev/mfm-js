@@ -28,6 +28,7 @@
 		"@microsoft/api-extractor": "7.58.9",
 		"@types/node": "26.2.0",
 		"esbuild": "0.28.2",
+		"fast-check": "4.9.0",
 		"vitest": "4.1.11"
 	},
 	"files": [
