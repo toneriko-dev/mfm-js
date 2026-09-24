@@ -888,6 +888,7 @@ hoge`;
 					LINK(false, 'https://misskey.io/@ai', [BOLD([TEXT('[https://misskey.io/@ai](https://misskey.io/@ai)')])]),
 					TEXT('.'),
 				];
+				assert.deepStrictEqual(mfm.parse(input), output);
 			});
 		});
 
