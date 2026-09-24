@@ -1,6 +1,6 @@
 import { fullParser, simpleParser } from './internal';
 import { inspectOne, stringifyNode, stringifyTree } from './internal/util';
-import { MfmMention, MfmNode, MfmSimpleNode } from './node';
+import type { MfmMention, MfmNode, MfmSimpleNode } from './node';
 
 export function parse(input: string, opts: Partial<{ nestLimit: number }> = {}): MfmNode[] {
 	const nodes = fullParser(

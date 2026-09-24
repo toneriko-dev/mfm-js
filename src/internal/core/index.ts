@@ -22,8 +22,8 @@ export type ParserHandler<T> = (input: string, index: number, state: State) => R
 export function success<T>(index: number, value: T): Success<T> {
 	return {
 		success: true,
-		value: value,
-		index: index,
+		value,
+		index,
 	};
 }
 
@@ -231,7 +231,7 @@ export const lineEnd = new Parser((input, index, _state) => {
 });
 
 export function lazy<T>(fn: () => Parser<T>): Parser<T> {
-	const parser: Parser<T> = new Parser((input, index, state) => {
+	const parser: Parser<T> = new Parser<T>((input, index, state) => {
 		parser.handler = fn().handler;
 		return parser.handler(input, index, state);
 	});

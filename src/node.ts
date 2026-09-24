@@ -4,9 +4,9 @@ export type MfmSimpleNode = MfmUnicodeEmoji | MfmEmojiCode | MfmText | MfmPlain;
 
 export type MfmBlock = MfmQuote | MfmSearch | MfmCodeBlock | MfmMathBlock | MfmCenter;
 
-const blockTypes: MfmNode['type'][] = ['quote', 'search', 'blockCode', 'mathBlock', 'center'];
+const blockTypes: ReadonlySet<MfmNode['type']> = new Set(['quote', 'search', 'blockCode', 'mathBlock', 'center']);
 export function isMfmBlock(node: MfmNode): node is MfmBlock {
-	return blockTypes.includes(node.type);
+	return blockTypes.has(node.type);
 }
 
 export type MfmQuote = {
@@ -98,7 +98,7 @@ export type MfmEmojiCode = {
 	children?: [];
 };
 export const EMOJI_CODE = (name: string): NodeType<'emojiCode'> => {
-	return { type: 'emojiCode', props: { name: name } };
+	return { type: 'emojiCode', props: { name } };
 };
 
 export type MfmBold = {

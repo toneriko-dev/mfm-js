@@ -1,5 +1,5 @@
 import { describe, test } from 'vitest';
-import assert from 'assert';
+import assert from 'node:assert';
 import * as mfm from '../src/index';
 import {
 	TEXT,

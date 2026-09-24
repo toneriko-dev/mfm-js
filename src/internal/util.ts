@@ -1,4 +1,5 @@
-import { isMfmBlock, MfmInline, MfmNode, MfmText, TEXT } from '../node';
+import type { MfmInline, MfmNode, MfmText } from '../node';
+import { isMfmBlock, TEXT } from '../node';
 
 type ArrayRecursive<T> = T | ArrayRecursive<T>[];
 

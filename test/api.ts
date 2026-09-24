@@ -1,5 +1,5 @@
 import { describe, test } from 'vitest';
-import assert from 'assert';
+import assert from 'node:assert';
 import * as mfm from '../src/index';
 import {
 	TEXT,
@@ -187,7 +187,7 @@ after`;
 			const result = mfm.parse(input);
 			mfm.inspect(result, (node) => {
 				if (node.type == 'text') {
-					node.props.text = node.props.text.replace(/good morning/g, 'hello');
+					node.props.text = node.props.text.replaceAll('good morning', 'hello');
 				}
 			});
 			assert.strictEqual(mfm.toString(result), 'hello $[tada everynyan!]');
@@ -198,7 +198,7 @@ after`;
 			const result = mfm.parse(input);
 			mfm.inspect(result[1], (node) => {
 				if (node.type == 'text') {
-					node.props.text = node.props.text.replace(/one/g, 'nyan');
+					node.props.text = node.props.text.replaceAll('one', 'nyan');
 				}
 			});
 			assert.strictEqual(mfm.toString(result), 'good morning $[tada everynyan!]');

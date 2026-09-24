@@ -3,7 +3,7 @@ import { emojiRegex } from '@misskey-dev/emoji-data';
 import * as M from '../node';
 import * as P from './core';
 import { mergeText } from './util';
-import { SeqParseResult } from './core';
+import type { SeqParseResult } from './core';
 
 type ArgPair = { k: string; v: string | true };
 type Args = Record<string, string | true>;
@@ -799,7 +799,7 @@ export function createMfmLanguage(opts: { optimizations: boolean }) {
 				if (!result.success) {
 					return P.failure();
 				}
-				const text = result.value.slice(1, result.value.length - 1);
+				const text = result.value.slice(1, -1);
 				return P.success(result.index, M.N_URL(text, true));
 			});
 		},
