@@ -65,10 +65,10 @@ function nest<T>(parser: P.Parser<T>, fallback?: P.Parser<string>): P.Parser<T |
  * - 絵文字: emojiRegex のソースに現れる全コード単位 (先頭に限らないので上位集合)
  * - 行頭 (直前が改行か入力の先頭): search は任意の文字から始まるため、行頭では常に候補を試す
  */
-const PLAIN_TEXT_TABLE = buildPlainTextTable();
+const EMOJI_UNITS = collectRegexCodeUnits(emojiRegex);
+const PLAIN_TEXT_TABLE = buildPlainTextTable(EMOJI_UNITS);
 
-function buildPlainTextTable(): Uint8Array | null {
-	const emojiUnits = collectRegexCodeUnits(emojiRegex);
+function buildPlainTextTable(emojiUnits: Set<number> | null): Uint8Array | null {
 	if (emojiUnits == null) {
 		return null;
 	}
@@ -185,6 +185,85 @@ function withPlainTextFastPath<T>(parser: P.Parser<T | string>): P.Parser<T | st
 	});
 }
 
+/** 構文が最初に消費し得る文字。emoji は emojiRegex に現れる全コード単位、lineBegin は行頭なら任意の文字。 */
+type StartSet = { chars?: string; emoji?: true; lineBegin?: true; any?: true };
+
+/*
+ * 表で止まった位置 (構文を始め得る文字と行頭) では、全 27 構文を順に試していた。数字は絵文字の
+ * キーキャップのため表で止まり、数字の多い文では 1 文字あたり約 1.6µs かかっていた。先頭の文字で成立し得ない
+ * 構文を候補から外し、残りを元の順序のまま試す。P.alt は最初に成功した構文を採るので、外した構文が
+ * その文字で必ず失敗する限り出力は変わらない。候補の組み合わせは数十通りなので、組み合わせごとに共有する。
+ */
+function dispatchAlt<T>(entries: readonly (readonly [P.Parser<T>, StartSet])[]): P.Parser<T> {
+	const all = P.alt(entries.map(([parser]) => parser));
+	const emojiUnits = EMOJI_UNITS;
+	if (emojiUnits == null) {
+		return all;
+	}
+	let anyMask = 0;
+	let lineBeginMask = 0;
+	let emojiMask = 0;
+	const charMasks = new Map<number, number>();
+	entries.forEach(([, start], bit) => {
+		const flag = 1 << bit;
+		if (start.any) anyMask |= flag;
+		if (start.lineBegin) lineBeginMask |= flag;
+		if (start.emoji) emojiMask |= flag;
+		for (const char of start.chars ?? '') {
+			const code = char.charCodeAt(0);
+			charMasks.set(code, (charMasks.get(code) ?? 0) | flag);
+		}
+	});
+	const byMask = new Map<number, P.Parser<T>>();
+	return new P.Parser<T>((input, index, state) => {
+		if (index >= input.length) {
+			return all.handler(input, index, state);
+		}
+		const code = input.charCodeAt(index);
+		const previous = index === 0 ? 0x0a : input.charCodeAt(index - 1);
+		let mask = anyMask | (charMasks.get(code) ?? 0);
+		if (previous === 0x0a || previous === 0x0d) mask |= lineBeginMask;
+		if (emojiUnits.has(code)) mask |= emojiMask;
+		let parser = byMask.get(mask);
+		if (parser == null) {
+			parser = P.alt(entries.filter((_, bit) => (mask & (1 << bit)) !== 0).map(([candidate]) => candidate));
+			byMask.set(mask, parser);
+		}
+		return parser.handler(input, index, state);
+	});
+}
+
+// 先頭文字の根拠は各構文の最初に消費する parser。改行で始まり得るのは newLine.option() を先頭に持つ構文。
+const RULE_STARTS = {
+	unicodeEmoji: { emoji: true },
+	centerTag: { chars: '\r\n<' },
+	smallTag: { chars: '<' },
+	plainTag: { chars: '<' },
+	boldTag: { chars: '<' },
+	italicTag: { chars: '<' },
+	strikeTag: { chars: '<' },
+	urlAlt: { chars: '<' },
+	big: { chars: '*' },
+	boldAsta: { chars: '*' },
+	italicAsta: { chars: '*' },
+	boldUnder: { chars: '_' },
+	italicUnder: { chars: '_' },
+	codeBlock: { chars: '\r\n`' },
+	inlineCode: { chars: '`' },
+	quote: { chars: '\r\n>' },
+	mathBlock: { chars: '\r\n\\' },
+	mathInline: { chars: '\\' },
+	strikeWave: { chars: '~' },
+	fn: { chars: '$' },
+	mention: { chars: '@' },
+	hashtag: { chars: '#' },
+	emojiCode: { chars: ':' },
+	link: { chars: '?[' },
+	url: { chars: 'h' },
+	search: { chars: '\r\n', lineBegin: true },
+	text: { any: true },
+} as const satisfies Record<string, StartSet>;
+
 interface TypeTable {
 	fullParser: (M.MfmNode | string)[];
 	simpleParser: (M.MfmSimpleNode | string)[];
@@ -224,8 +303,12 @@ interface TypeTable {
  * optimizations: false は表引きと検索構文の行末判定を使わない元の文法。差分テストの基準にだけ使う。
  */
 export function createMfmLanguage(opts: { optimizations: boolean }) {
-	const fast = <T>(parser: P.Parser<T | string>): P.Parser<T | string> =>
-		opts.optimizations ? withPlainTextFastPath(parser) : parser;
+	type RuleName = keyof typeof RULE_STARTS;
+	// 元の文法は構文を順に試す P.alt。最適化時は先頭文字で候補を絞り、普通の文字の連続は表引きでまとめる。
+	const choose = <T>(r: P.ParserTable<TypeTable>, names: readonly RuleName[]): P.Parser<T | string> => {
+		const entries = names.map((name) => [r[name] as P.Parser<T | string>, RULE_STARTS[name]] as const);
+		return opts.optimizations ? withPlainTextFastPath(dispatchAlt(entries)) : P.alt(entries.map(([parser]) => parser));
+	};
 
 	// P.altは最初にmatchしたparserを採用するため、各配列の順序は構文の優先順位を表す。
 	return P.createLanguage<TypeTable>({
@@ -238,70 +321,66 @@ export function createMfmLanguage(opts: { optimizations: boolean }) {
 		},
 
 		full: (r) => {
-			return fast(
-				P.alt([
-					r.unicodeEmoji,
-					r.centerTag,
-					r.smallTag,
-					r.plainTag,
-					r.boldTag,
-					r.italicTag,
-					r.strikeTag,
-					r.urlAlt,
-					r.big,
-					r.boldAsta,
-					r.italicAsta,
-					r.boldUnder,
-					r.italicUnder,
-					r.codeBlock,
-					r.inlineCode,
-					r.quote,
-					r.mathBlock,
-					r.mathInline,
-					r.strikeWave,
-					r.fn,
-					r.mention,
-					r.hashtag,
-					r.emojiCode,
-					r.link,
-					r.url,
-					r.search,
-					r.text,
-				]),
-			);
+			return choose(r, [
+				'unicodeEmoji',
+				'centerTag',
+				'smallTag',
+				'plainTag',
+				'boldTag',
+				'italicTag',
+				'strikeTag',
+				'urlAlt',
+				'big',
+				'boldAsta',
+				'italicAsta',
+				'boldUnder',
+				'italicUnder',
+				'codeBlock',
+				'inlineCode',
+				'quote',
+				'mathBlock',
+				'mathInline',
+				'strikeWave',
+				'fn',
+				'mention',
+				'hashtag',
+				'emojiCode',
+				'link',
+				'url',
+				'search',
+				'text',
+			]);
 		},
 
 		simple: (r) => {
-			return fast(P.alt([r.unicodeEmoji, r.emojiCode, r.plainTag, r.text]));
+			return choose(r, ['unicodeEmoji', 'emojiCode', 'plainTag', 'text']);
 		},
 
 		inline: (r) => {
-			return fast(
-				P.alt([
-					r.unicodeEmoji,
-					r.smallTag,
-					r.plainTag,
-					r.boldTag,
-					r.italicTag,
-					r.strikeTag,
-					r.urlAlt,
-					r.big,
-					r.boldAsta,
-					r.italicAsta,
-					r.boldUnder,
-					r.italicUnder,
-					r.inlineCode,
-					r.mathInline,
-					r.strikeWave,
-					r.fn,
-					r.mention,
-					r.hashtag,
-					r.emojiCode,
-					r.link,
-					r.url,
-					r.text,
-				]),
-			);
+			return choose(r, [
+				'unicodeEmoji',
+				'smallTag',
+				'plainTag',
+				'boldTag',
+				'italicTag',
+				'strikeTag',
+				'urlAlt',
+				'big',
+				'boldAsta',
+				'italicAsta',
+				'boldUnder',
+				'italicUnder',
+				'inlineCode',
+				'mathInline',
+				'strikeWave',
+				'fn',
+				'mention',
+				'hashtag',
+				'emojiCode',
+				'link',
+				'url',
+				'text',
+			]);
 		},
 
 		quote: (r) => {
@@ -469,8 +548,8 @@ export function createMfmLanguage(opts: { optimizations: boolean }) {
 				if (!result.success) {
 					return P.failure();
 				}
-				const beforeStr = input.slice(0, index);
-				if (/[a-z0-9]$/i.test(beforeStr)) {
+				// 直前の 1 文字だけを見る。先頭からの切り出しは一致のたびに入力長に比例していた。
+				if (index > 0 && /[a-z0-9]/i.test(input.charAt(index - 1))) {
 					return P.failure();
 				}
 				return P.success(result.index, M.ITALIC(mergeText(result.value[1])));
@@ -485,8 +564,8 @@ export function createMfmLanguage(opts: { optimizations: boolean }) {
 				if (!result.success) {
 					return P.failure();
 				}
-				const beforeStr = input.slice(0, index);
-				if (/[a-z0-9]$/i.test(beforeStr)) {
+				// 直前の 1 文字だけを見る。先頭からの切り出しは一致のたびに入力長に比例していた。
+				if (index > 0 && /[a-z0-9]/i.test(input.charAt(index - 1))) {
 					return P.failure();
 				}
 				return P.success(result.index, M.ITALIC(mergeText(result.value[1])));
@@ -630,8 +709,8 @@ export function createMfmLanguage(opts: { optimizations: boolean }) {
 				if (!result.success) {
 					return P.failure();
 				}
-				const beforeStr = input.slice(0, index);
-				if (/[a-z0-9]$/i.test(beforeStr)) {
+				// 直前の 1 文字だけを見る。先頭からの切り出しは一致のたびに入力長に比例していた。
+				if (index > 0 && /[a-z0-9]/i.test(input.charAt(index - 1))) {
 					return P.failure();
 				}
 				let invalidMention = false;
@@ -693,8 +772,8 @@ export function createMfmLanguage(opts: { optimizations: boolean }) {
 				if (!result.success) {
 					return P.failure();
 				}
-				const beforeStr = input.slice(0, index);
-				if (/[a-z0-9]$/i.test(beforeStr)) {
+				// 直前の 1 文字だけを見る。先頭からの切り出しは一致のたびに入力長に比例していた。
+				if (index > 0 && /[a-z0-9]/i.test(input.charAt(index - 1))) {
 					return P.failure();
 				}
 				const resultIndex = result.index;
@@ -832,6 +911,11 @@ export function createMfmLanguage(opts: { optimizations: boolean }) {
 					lineStart += 2;
 				} else if (input[lineStart] === '\r' || input[lineStart] === '\n') {
 					lineStart += 1;
+				}
+				// 行頭でなければ本体の lineBegin で必ず失敗する。行末の判定より先に落とさないと、構文を
+				// 始め得る文字のたびに行の残りを読み直し、長い行で文字数の 2 乗の時間になる (1,088 字で 7.3µs/字)。
+				if (lineStart > 0 && input[lineStart - 1] !== '\n' && input[lineStart - 1] !== '\r') {
+					return P.failure();
 				}
 				let lineEnd = lineStart;
 				while (lineEnd < input.length && input[lineEnd] !== '\r' && input[lineEnd] !== '\n') {
