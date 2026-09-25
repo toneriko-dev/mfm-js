@@ -52,19 +52,16 @@ function nest<T>(parser: P.Parser<T>, fallback?: P.Parser<string>): P.Parser<T |
 	});
 }
 
-/*
- * full / inline / simple は位置ごとに最大 27 構文を順に試し、全て失敗したときだけ 1 文字の text になる。
- * 普通の文章では大半の文字がこの経路を通り、日本語 189 字で約 560µs かかっていた (表引きと検索構文の行末判定の後は約 21µs)。
- * 構文ごとに成立し得る先頭の UTF-16 コード単位は決まっているので、どの構文も始まり得ない文字は
- * 候補を試さずに text とする。判定は表引きだけで、出力は変えない。
- *
- * 先頭文字の根拠 (各構文の最初に消費する parser):
- * - 改行 (\r \n): newLine.option() から始まる quote / codeBlock / mathBlock / centerTag / search
- * - < > * _ ` \ ~ $ @ # : ? [: 各構文の開始記号 (quote の > と search は行頭でのみ成立)
- * - h: url (/https?:\/\//)
- * - 絵文字: emojiRegex のソースに現れる全コード単位 (先頭に限らないので上位集合)
- * - 行頭 (直前が改行か入力の先頭): search は任意の文字から始まるため、行頭では常に候補を試す
- */
+// full / inline / simple は位置ごとに最大 27 構文を順に試し、全て失敗したときだけ 1 文字の text になる。
+// 普通の文章では大半の文字がこの経路を通るため、どの構文も始まり得ない UTF-16 コード単位は表引きだけで text とし、
+// 出力は変えない (日本語 189 字で約 560µs → 約 21µs、検索構文の行末判定と合わせた実測)。
+//
+// 先頭文字の根拠 (各構文の最初に消費する parser):
+// - 改行 (\r \n): newLine.option() から始まる quote / codeBlock / mathBlock / centerTag / search
+// - < > * _ ` \ ~ $ @ # : ? [: 各構文の開始記号 (quote の > と search は行頭でのみ成立)
+// - h: url (/https?:\/\//)
+// - 絵文字: emojiRegex のソースに現れる全コード単位 (先頭に限らないので上位集合)
+// - 行頭 (直前が改行か入力の先頭): search は任意の文字から始まるため、行頭では常に候補を試す
 const EMOJI_UNITS = collectRegexCodeUnits(emojiRegex);
 const PLAIN_TEXT_TABLE = buildPlainTextTable(EMOJI_UNITS);
 
@@ -82,11 +79,8 @@ function buildPlainTextTable(emojiUnits: Set<number> | null): Uint8Array | null 
 	return table;
 }
 
-/**
- * 正規表現のソースに現れるコード単位を、文字クラスの範囲も展開して集める。
- * 列挙できない構成 (. / \d 等の文字集合エスケープ / 否定クラス / i・u・v フラグ) があれば null を返し、
- * 呼び出し側は表引きを使わない。
- */
+// 正規表現のソースに現れるコード単位を、文字クラスの範囲も展開して集める。列挙できない構成
+// (. / \d 等の文字集合エスケープ / 否定クラス / i・u・v フラグ) があれば null を返し、呼び出し側は表引きを使わない。
 function collectRegexCodeUnits(pattern: RegExp): Set<number> | null {
 	if (/[iuv]/.test(pattern.flags)) {
 		return null;
@@ -152,13 +146,11 @@ function collectRegexCodeUnits(pattern: RegExp): Set<number> | null {
 	return units;
 }
 
-/*
- * 普通の文字が続く間はまとめて 1 つの text にする。mergeText で隣接 text は結合されるので出力は同じ。
- * 途中で止めるのは、構文を始め得る文字と、入れ子の外側のループが閉じ判定に使う文字の手前。
- * 閉じ判定 (notMatch(close) の直後に inline / full を呼ぶ箇所) の先頭文字は 改行・<・*・~・] で、
- * ] 以外は構文の開始文字として表で既に止まる。外側の判定は各呼び出しの前にだけ走るため、
- * 呼び出し位置の 1 文字目が ] でも、その先の ] で止まれば判定を飛ばさない。
- */
+// 普通の文字が続く間はまとめて 1 つの text にする。mergeText で隣接 text は結合されるので出力は同じ。
+// 途中で止めるのは、構文を始め得る文字と、入れ子の外側のループが閉じ判定に使う文字の手前。
+// 閉じ判定 (notMatch(close) の直後に inline / full を呼ぶ箇所) の先頭文字は 改行・<・*・~・] で、
+// ] 以外は構文の開始文字として表で既に止まる。外側の判定は各呼び出しの前にだけ走るため、
+// 呼び出し位置の 1 文字目が ] でも、その先の ] で止まれば判定を飛ばさない。
 const CLOSE_BRACKET = 0x5d;
 
 function withPlainTextFastPath<T>(parser: P.Parser<T | string>): P.Parser<T | string> {
@@ -188,12 +180,10 @@ function withPlainTextFastPath<T>(parser: P.Parser<T | string>): P.Parser<T | st
 /** 構文が最初に消費し得る文字。emoji は emojiRegex に現れる全コード単位、lineBegin は行頭なら任意の文字。 */
 type StartSet = { chars?: string; emoji?: true; lineBegin?: true; any?: true };
 
-/*
- * 表で止まった位置 (構文を始め得る文字と行頭) では、全 27 構文を順に試していた。数字は絵文字の
- * キーキャップのため表で止まり、数字の多い文では 1 文字あたり約 1.6µs かかっていた。先頭の文字で成立し得ない
- * 構文を候補から外し、残りを元の順序のまま試す。P.alt は最初に成功した構文を採るので、外した構文が
- * その文字で必ず失敗する限り出力は変わらない。候補の組み合わせは数十通りなので、組み合わせごとに共有する。
- */
+// 表で止まった位置 (構文を始め得る文字と行頭) では、先頭の文字で成立し得ない構文を候補から外し、残りを同じ順序で試す。
+// 数字は絵文字のキーキャップのため表で止まり、全 27 構文を試すと数字の多い文で 1 文字あたり約 1.6µs かかる。
+// P.alt は最初に成功した構文を採るので、外した構文がその文字で必ず失敗する限り出力は変わらない。
+// 候補の組み合わせは数十通りなので、組み合わせごとに parser を共有する。
 function dispatchAlt<T>(entries: readonly (readonly [P.Parser<T>, StartSet])[]): P.Parser<T> {
 	const all = P.alt(entries.map(([parser]) => parser));
 	const emojiUnits = EMOJI_UNITS;
@@ -299,24 +289,20 @@ interface TypeTable {
 	text: string;
 }
 
-/**
- * optimizations: false は表引きと検索構文の行末判定を使わない元の文法。差分テストの基準にだけ使う。
- */
+/** optimizations: false は表引きと検索構文の行末判定を使わない文法。差分テストの基準にだけ使う。 */
 export function createMfmLanguage(opts: { optimizations: boolean }) {
 	type RuleName = keyof typeof RULE_STARTS;
-	// 元の文法は構文を順に試す P.alt。最適化時は先頭文字で候補を絞り、普通の文字の連続は表引きでまとめる。
+	// 最適化なしでは構文を順に試す P.alt。最適化時は先頭文字で候補を絞り、普通の文字の連続は表引きでまとめる。
 	const choose = <T>(r: P.ParserTable<TypeTable>, names: readonly RuleName[]): P.Parser<T | string> => {
 		const entries = names.map((name) => [r[name] as P.Parser<T | string>, RULE_STARTS[name]] as const);
 		return opts.optimizations ? withPlainTextFastPath(dispatchAlt(entries)) : P.alt(entries.map(([parser]) => parser));
 	};
 
-	/*
-	 * 開き記号の後、item を繰り返してから tail (閉じ記号など) を読む構文用。閉じの無い開き記号が 1 行に並ぶと、
-	 * 開始位置ごとに本文を行末 (<center> や \\[ では入力末尾) まで読み直して失敗し、長さの 2 乗の時間になっていた
-	 * (`[` 4,000 字で 2.5 秒、`\\[` + 改行 2,000 字で 331 ms)。本文ループのある位置から先の結果は
-	 * 入力・位置・深さ・リンクラベル内かどうかだけで決まり、many は後戻りしないので、失敗した試行が通った位置を覚え、
-	 * 後の試行がそこへ来たら読まずに失敗とする。成功した試行の位置は覚えない (外側はその終端より後から再開する)。
-	 */
+	// 開き記号の後、item を繰り返してから tail (閉じ記号など) を読む構文用。閉じの無い開き記号が 1 行に並ぶと、
+	// 開始位置ごとに本文を行末 (<center> や \\[ では入力末尾) まで読み直して失敗し、長さの 2 乗の時間になる
+	// (`[` 4,000 字で 2.5 秒、`\\[` + 改行 2,000 字で 331 ms)。本文ループのある位置から先の結果は
+	// 入力・位置・深さ・リンクラベル内かどうかだけで決まり、many は後戻りしないので、失敗した試行が通った位置を覚え、
+	// 後の試行がそこへ来たら読まずに失敗とする。成功した試行の位置は覚えない (外側はその終端より後から再開する)。
 	let scanKinds = 0;
 	const scanThen = <T, U>(item: P.Parser<T>, min: number, tail: P.Parser<U>): P.Parser<[T[], U]> => {
 		const plain = P.seq(item.many(min), tail) as P.Parser<[T[], U]>;
@@ -595,7 +581,7 @@ export function createMfmLanguage(opts: { optimizations: boolean }) {
 				if (!result.success) {
 					return P.failure();
 				}
-				// 直前の 1 文字だけを見る。先頭からの切り出しは一致のたびに入力長に比例していた。
+				// 直前の 1 文字だけを見る (先頭から切り出すと一致のたびに入力長に比例する)。
 				if (index > 0 && /[a-z0-9]/i.test(input.charAt(index - 1))) {
 					return P.failure();
 				}
@@ -611,7 +597,7 @@ export function createMfmLanguage(opts: { optimizations: boolean }) {
 				if (!result.success) {
 					return P.failure();
 				}
-				// 直前の 1 文字だけを見る。先頭からの切り出しは一致のたびに入力長に比例していた。
+				// 直前の 1 文字だけを見る (先頭から切り出すと一致のたびに入力長に比例する)。
 				if (index > 0 && /[a-z0-9]/i.test(input.charAt(index - 1))) {
 					return P.failure();
 				}
@@ -751,7 +737,7 @@ export function createMfmLanguage(opts: { optimizations: boolean }) {
 				if (!result.success) {
 					return P.failure();
 				}
-				// 直前の 1 文字だけを見る。先頭からの切り出しは一致のたびに入力長に比例していた。
+				// 直前の 1 文字だけを見る (先頭から切り出すと一致のたびに入力長に比例する)。
 				if (index > 0 && /[a-z0-9]/i.test(input.charAt(index - 1))) {
 					return P.failure();
 				}
@@ -814,7 +800,7 @@ export function createMfmLanguage(opts: { optimizations: boolean }) {
 				if (!result.success) {
 					return P.failure();
 				}
-				// 直前の 1 文字だけを見る。先頭からの切り出しは一致のたびに入力長に比例していた。
+				// 直前の 1 文字だけを見る (先頭から切り出すと一致のたびに入力長に比例する)。
 				if (index > 0 && /[a-z0-9]/i.test(input.charAt(index - 1))) {
 					return P.failure();
 				}

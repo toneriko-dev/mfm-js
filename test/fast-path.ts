@@ -3,7 +3,7 @@ import fc from 'fast-check';
 import { createMfmLanguage } from '../src/internal/parser';
 import { mergeText } from '../src/internal/util';
 
-// 表引きで text を先に返す経路・検索構文の行末判定と、全構文を順に試す元の文法とで出力が一致することを確かめる。
+// 表引きで text を先に返す経路・検索構文の行末判定と、全構文を順に試す最適化なしの文法とで出力が一致することを確かめる。
 const reference = createMfmLanguage({ optimizations: false });
 const optimized = createMfmLanguage({ optimizations: true });
 
@@ -251,8 +251,8 @@ describe('parser fast paths', () => {
 		expect(full(optimized, input, 2)).toContainEqual(expect.objectContaining({ type: 'link' }));
 	});
 
-	// 閉じの無い開き記号を投稿の上限 (8,192 字) まで並べた入力。以前は開始位置ごとに行末や入力末尾まで
-	// 読み直して `[` で 10 秒、`\[` + 改行で数秒かかっていた。いまは各数 ms なので、上限は負荷の揺れを見込んで広く取る。
+	// 閉じの無い開き記号を投稿の上限 (8,192 字) まで並べた入力。開始位置ごとに行末や入力末尾まで読み直すと
+	// `[` で 10 秒、`\[` + 改行で数秒かかる。現在は各数 ms なので、上限は負荷の揺れを見込んで広く取る。
 	const repeatTo = (unit: string, tail = '') =>
 		unit.repeat(Math.ceil((8192 - tail.length) / unit.length)).slice(0, 8192 - tail.length) + tail;
 	test.each([

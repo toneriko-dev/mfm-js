@@ -71,11 +71,6 @@ after`;
 			assert.strictEqual(mfm.toString(mfm.parse(input)), input);
 		});
 
-		// test('center (single line)', () => {
-		// 	const input = '<center>abc</center>';
-		// 	assert.strictEqual(mfm.toString(mfm.parse(input)), input);
-		// });
-
 		test('emoji code', () => {
 			const input = ':abc:';
 			assert.strictEqual(mfm.toString(mfm.parse(input)), input);
@@ -97,20 +92,10 @@ after`;
 			assert.strictEqual(mfm.toString(mfm.parse(input)), input);
 		});
 
-		// test('bold tag', () => {
-		// 	const input = '<b>abc</b>';
-		// 	assert.strictEqual(mfm.toString(mfm.parse(input)), input);
-		// });
-
 		test('small', () => {
 			const input = '<small>abc</small>';
 			assert.strictEqual(mfm.toString(mfm.parse(input)), input);
 		});
-
-		// test('italic', () => {
-		// 	const input = '*abc*';
-		// 	assert.strictEqual(mfm.toString(mfm.parse(input)), input);
-		// });
 
 		test('italic tag', () => {
 			const input = '<i>abc</i>';
@@ -121,11 +106,6 @@ after`;
 			const input = '~~foo~~';
 			assert.strictEqual(mfm.toString(mfm.parse(input)), input);
 		});
-
-		// test('strike tag', () => {
-		// 	const input = '<s>foo</s>';
-		// 	assert.strictEqual(mfm.toString(mfm.parse(input)), input);
-		// });
 
 		test('inline code', () => {
 			const input = 'AiScript: `#abc = 2`';
