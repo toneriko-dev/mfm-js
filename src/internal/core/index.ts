@@ -15,6 +15,8 @@ interface State {
 	linkLabel?: boolean;
 	nestLimit: number;
 	depth: number;
+	/** 本文ループが失敗に行き着いた位置。入力ごと・ループの種類と深さごとに持つ (parser.ts の scanThen)。 */
+	scanFailures?: Map<string, Map<number, Set<number>>>;
 }
 
 export type ParserHandler<T> = (input: string, index: number, state: State) => Result<T>;

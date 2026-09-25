@@ -310,6 +310,57 @@ export function createMfmLanguage(opts: { optimizations: boolean }) {
 		return opts.optimizations ? withPlainTextFastPath(dispatchAlt(entries)) : P.alt(entries.map(([parser]) => parser));
 	};
 
+	/*
+	 * 開き記号の後、item を繰り返してから tail (閉じ記号など) を読む構文用。閉じの無い開き記号が 1 行に並ぶと、
+	 * 開始位置ごとに本文を行末 (<center> や \\[ では入力末尾) まで読み直して失敗し、長さの 2 乗の時間になっていた
+	 * (`[` 4,000 字で 2.5 秒、`\\[` + 改行 2,000 字で 331 ms)。本文ループのある位置から先の結果は
+	 * 入力・位置・深さ・リンクラベル内かどうかだけで決まり、many は後戻りしないので、失敗した試行が通った位置を覚え、
+	 * 後の試行がそこへ来たら読まずに失敗とする。成功した試行の位置は覚えない (外側はその終端より後から再開する)。
+	 */
+	let scanKinds = 0;
+	const scanThen = <T, U>(item: P.Parser<T>, min: number, tail: P.Parser<U>): P.Parser<[T[], U]> => {
+		const plain = P.seq(item.many(min), tail) as P.Parser<[T[], U]>;
+		if (!opts.optimizations) {
+			return plain;
+		}
+		const kind = scanKinds++;
+		return new P.Parser<[T[], U]>((input, index, state) => {
+			state.scanFailures ??= new Map();
+			let byKind = state.scanFailures.get(input);
+			if (byKind == null) {
+				byKind = new Map();
+				state.scanFailures.set(input, byKind);
+			}
+			const slot = (state.depth * 2 + (state.linkLabel ? 1 : 0)) * 64 + kind;
+			let failed = byKind.get(slot);
+			if (failed == null) {
+				failed = new Set();
+				byKind.set(slot, failed);
+			}
+			const visited: number[] = [];
+			const fail = () => {
+				for (const position of visited) failed.add(position);
+				return P.failure();
+			};
+			const items: T[] = [];
+			let latestIndex = index;
+			while (latestIndex < input.length) {
+				if (failed.has(latestIndex)) return fail();
+				visited.push(latestIndex);
+				const result = item.handler(input, latestIndex, state);
+				if (!result.success) break;
+				latestIndex = result.index;
+				items.push(result.value);
+			}
+			if (latestIndex >= input.length && failed.has(latestIndex)) return fail();
+			visited.push(latestIndex);
+			if (items.length < min) return fail();
+			const result = tail.handler(input, latestIndex, state);
+			if (!result.success) return fail();
+			return P.success(result.index, [items, result.value] as [T[], U]);
+		});
+	};
+
 	// P.altは最初にmatchしたparserを採用するため、各配列の順序は構文の優先順位を表す。
 	return P.createLanguage<TypeTable>({
 		fullParser: (r) => {
@@ -449,15 +500,13 @@ export function createMfmLanguage(opts: { optimizations: boolean }) {
 				P.lineBegin,
 				open,
 				newLine.option(),
-				P.seq(P.notMatch(P.seq(newLine.option(), close)), P.char)
-					.select(1)
-					.many(1),
-				newLine.option(),
-				close,
-				P.lineEnd,
-				newLine.option(),
+				scanThen(
+					P.seq(P.notMatch(P.seq(newLine.option(), close)), P.char).select(1),
+					1,
+					P.seq(newLine.option(), close, P.lineEnd, newLine.option()),
+				),
 			).map((result) => {
-				const formula = result[4].join('');
+				const formula = result[4][0].join('');
 				return M.MATH_BLOCK(formula);
 			});
 		},
@@ -470,15 +519,13 @@ export function createMfmLanguage(opts: { optimizations: boolean }) {
 				P.lineBegin,
 				open,
 				newLine.option(),
-				P.seq(P.notMatch(P.seq(newLine.option(), close)), nest(r.inline))
-					.select(1)
-					.many(1),
-				newLine.option(),
-				close,
-				P.lineEnd,
-				newLine.option(),
+				scanThen(
+					P.seq(P.notMatch(P.seq(newLine.option(), close)), nest(r.inline)).select(1),
+					1,
+					P.seq(newLine.option(), close, P.lineEnd, newLine.option()),
+				),
 			).map((result) => {
-				return M.CENTER(mergeText(result[4]));
+				return M.CENTER(mergeText(result[4][0]));
 			});
 		},
 
@@ -613,15 +660,14 @@ export function createMfmLanguage(opts: { optimizations: boolean }) {
 			return P.seq(
 				open,
 				newLine.option(),
-				P.seq(P.notMatch(P.seq(newLine.option(), close)), P.char)
-					.select(1)
-					.many(1)
-					.text(),
-				newLine.option(),
-				close,
+				scanThen(
+					P.seq(P.notMatch(P.seq(newLine.option(), close)), P.char).select(1),
+					1,
+					P.seq(newLine.option(), close),
+				),
 			)
 				.select(2)
-				.map((result) => M.PLAIN(result));
+				.map((result) => M.PLAIN(result[0].join('')));
 		},
 
 		fn: (r) => {
@@ -685,13 +731,9 @@ export function createMfmLanguage(opts: { optimizations: boolean }) {
 		mathInline: () => {
 			const open = P.str('\\(');
 			const close = P.str('\\)');
-			return P.seq(
-				open,
-				P.seq(P.notMatch(P.alt([close, newLine])), P.char)
-					.select(1)
-					.many(1),
-				close,
-			).map((result) => M.MATH_INLINE(result[1].join('')));
+			return P.seq(open, scanThen(P.seq(P.notMatch(P.alt([close, newLine])), P.char).select(1), 1, close)).map(
+				(result) => M.MATH_INLINE(result[1][0].join('')),
+			);
 		},
 
 		mention: () => {
@@ -801,32 +843,21 @@ export function createMfmLanguage(opts: { optimizations: boolean }) {
 				return result;
 			});
 			const closeLabel = P.str(']');
+			const target = P.seq(closeLabel, P.str('('), P.alt([r.urlAlt, r.url]), P.str(')'));
+			// url が文字列 (末尾の . , を除くと空) のときはリンクにしない。
+			const urlTarget = new P.Parser<M.MfmUrl>((input, index, state) => {
+				const result = target.handler(input, index, state);
+				if (!result.success || typeof result.value[2] === 'string') {
+					return P.failure();
+				}
+				return P.success(result.index, result.value[2]);
+			});
 			const parser = P.seq(
 				notLinkLabel,
 				P.alt([P.str('?['), P.str('[')]),
-				P.seq(P.notMatch(P.alt([closeLabel, newLine])), nest(labelInline))
-					.select(1)
-					.many(1),
-				closeLabel,
-				P.str('('),
-				P.alt([r.urlAlt, r.url]),
-				P.str(')'),
+				scanThen(P.seq(P.notMatch(P.alt([closeLabel, newLine])), nest(labelInline)).select(1), 1, urlTarget),
 			);
-			return new P.Parser<M.MfmLink>((input, index, state) => {
-				const result = parser.handler(input, index, state);
-				if (!result.success) {
-					return P.failure();
-				}
-
-				const [, prefix, label, , , url] = result.value;
-
-				const silent = prefix === '?[';
-				if (typeof url === 'string') {
-					return P.failure();
-				}
-
-				return P.success(result.index, M.LINK(silent, url.props.url, mergeText(label)));
-			});
+			return parser.map(([, prefix, [label, url]]) => M.LINK(prefix === '?[', url.props.url, mergeText(label)));
 		},
 
 		url: () => {
@@ -868,10 +899,7 @@ export function createMfmLanguage(opts: { optimizations: boolean }) {
 				notLinkLabel,
 				open,
 				P.regexp(/https?:\/\//),
-				P.seq(P.notMatch(P.alt([close, space])), P.char)
-					.select(1)
-					.many(1),
-				close,
+				scanThen(P.seq(P.notMatch(P.alt([close, space])), P.char).select(1), 1, close),
 			).text();
 			return new P.Parser((input, index, state) => {
 				const result = parser.handler(input, index, state);

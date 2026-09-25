@@ -173,6 +173,45 @@ const mfmText = fc
 
 const rawUnits = fc.string({ unit: 'binary', maxLength: 30 });
 
+// 閉じの無い開き記号が並ぶ入力。本文ループの失敗位置の記憶が、深さ・リンクラベル内外・入力の違いをまたいで
+// 誤って効かないことを確かめる (引用は中身を別の文字列として読み直す)。
+const openerText = fc
+	.array(
+		fc.constantFrom(
+			'[',
+			'?[',
+			']',
+			'](',
+			'(https://x.y)',
+			'(http://.)',
+			'\\(',
+			'\\)',
+			'\\[',
+			'\\]',
+			'<center>',
+			'</center>',
+			'<plain>',
+			'</plain>',
+			'<https://',
+			'>',
+			'> ',
+			'**',
+			'*',
+			'<b>',
+			'</b>',
+			'$[x2 ',
+			'@a',
+			'#t',
+			'`',
+			'`]`',
+			'a',
+			' ',
+			'\n',
+		),
+		{ maxLength: 60 },
+	)
+	.map((parts) => parts.join(''));
+
 // 失敗時の最小化は長くかかるので行わない。反例は最初に見つかった入力をそのまま表示する。
 fc.configureGlobal({ endOnFailure: true });
 
@@ -193,6 +232,45 @@ describe('parser fast paths', () => {
 			}),
 			{ numRuns: 5000 },
 		);
+	});
+
+	test('full parser output matches on runs of unclosed openers', () => {
+		fc.assert(
+			fc.property(openerText, fc.integer({ min: 0, max: 4 }), (input, nestLimit) => {
+				expect(full(optimized, input, nestLimit)).toEqual(full(reference, input, nestLimit));
+			}),
+			{ numRuns: 20000 },
+		);
+	});
+
+	// <center> の中 (深さ 1) では入れ子の上限でラベルの `]` を 1 文字ずつ読んで失敗し、<center> が閉じ損ねた後の
+	// 深さ 0 ではインラインコードが `]` を含めて読むのでリンクになる。失敗の記憶を深さで分けないと後者も失敗する。
+	test('a label that fails at the nest limit is retried at a shallower depth', () => {
+		const input = '<center>\n[`]`](https://x.y)\n</center>x';
+		expect(full(optimized, input, 2)).toEqual(full(reference, input, 2));
+		expect(full(optimized, input, 2)).toContainEqual(expect.objectContaining({ type: 'link' }));
+	});
+
+	// 閉じの無い開き記号を投稿の上限 (8,192 字) まで並べた入力。以前は開始位置ごとに行末や入力末尾まで
+	// 読み直して `[` で 10 秒、`\[` + 改行で数秒かかっていた。いまは各数 ms なので、上限は負荷の揺れを見込んで広く取る。
+	const repeatTo = (unit: string, tail = '') =>
+		unit.repeat(Math.ceil((8192 - tail.length) / unit.length)).slice(0, 8192 - tail.length) + tail;
+	test.each([
+		repeatTo('['),
+		repeatTo('?['),
+		repeatTo('*['),
+		repeatTo('\\('),
+		repeatTo('\\(a\\)['),
+		repeatTo('\\[\n'),
+		repeatTo('<center>\n'),
+		repeatTo('<plain>'),
+		repeatTo('<https://'),
+		// ラベルは閉じるが url が . だけでリンクにならない。
+		repeatTo('[', '](http://.)'),
+	])('%# unclosed openers up to 8,192 chars parse in linear time', (input) => {
+		const start = performance.now();
+		full(optimized, input, 20);
+		expect(performance.now() - start).toBeLessThan(250);
 	});
 
 	test('simple parser output matches the reference grammar', () => {
