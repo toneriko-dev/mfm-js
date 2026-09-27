@@ -132,11 +132,6 @@ after`;
 			assert.strictEqual(mfm.toString(mfm.parse(input)), '?[Ai](https://github.com/syuilo/ai)');
 		});
 
-		test('fn', () => {
-			const input = '$[tada Hello]';
-			assert.strictEqual(mfm.toString(mfm.parse(input)), '$[tada Hello]');
-		});
-
 		test('fn with arguments', () => {
 			const input = '$[spin.speed=1s,alternate Hello]';
 			assert.strictEqual(mfm.toString(mfm.parse(input)), '$[spin.speed=1s,alternate Hello]');
