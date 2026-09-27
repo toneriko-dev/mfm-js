@@ -251,6 +251,17 @@ describe('parser fast paths', () => {
 		expect(full(optimized, input, 2)).toContainEqual(expect.objectContaining({ type: 'link' }));
 	});
 
+	// 先頭の `[` をリンクとして読む試行が `](<https://>` の空の URL で失敗した後、深さ 0 の `<https://](<https://>` が
+	// 同じ `>` の位置に本文 1 字以上で来る。件数不足の失敗を位置で覚えると、こちらも URL にならない。
+	test('an empty bracketed URL does not fail a later non-empty one ending at the same position', () => {
+		const input = '[(https://x.y)<https://](<https://>';
+		expect(full(optimized, input, 0)).toEqual(full(reference, input, 0));
+		expect(full(optimized, input, 0)).toContainEqual({
+			type: 'url',
+			props: { url: 'https://](<https://', brackets: true },
+		});
+	});
+
 	// 閉じの無い開き記号を投稿の上限 (8,192 字) まで並べた入力。開始位置ごとに行末や入力末尾まで読み直すと
 	// `[` で 10 秒、`\[` + 改行で数秒かかる。現在は各数 ms なので、上限は負荷の揺れを見込んで広く取る。
 	const repeatTo = (unit: string, tail = '') =>

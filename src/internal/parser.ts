@@ -339,8 +339,10 @@ export function createMfmLanguage(opts: { optimizations: boolean }) {
 				items.push(result.value);
 			}
 			if (latestIndex >= input.length && failed.has(latestIndex)) return fail();
+			// 件数不足はそこまでに読んだ item の数で決まり、位置だけでは決まらないので覚えない。
+			// (`<https://>` の空の本文で失敗した位置を、先に 1 件以上読んで同じ位置へ来た試行が引くと誤って失敗する)
+			if (items.length < min) return P.failure();
 			visited.push(latestIndex);
-			if (items.length < min) return fail();
 			const result = tail.handler(input, latestIndex, state);
 			if (!result.success) return fail();
 			return P.success(result.index, [items, result.value] as [T[], U]);
