@@ -120,7 +120,7 @@ enum StringifyState {
 }
 
 export function stringifyTree(nodes: MfmNode[]): string {
-	const dest: MfmNode[] = [];
+	const dest: string[] = [];
 	let state: StringifyState = StringifyState.none;
 
 	for (const node of nodes) {
@@ -138,13 +138,13 @@ export function stringifyTree(nodes: MfmNode[]): string {
 			state = StringifyState.inline;
 		}
 		if (pushLf) {
-			dest.push(TEXT('\n'));
+			dest.push('\n');
 		}
 
-		dest.push(node);
+		dest.push(stringifyNode(node));
 	}
 
-	return dest.map((n) => stringifyNode(n)).join('');
+	return dest.join('');
 }
 
 export function inspectOne(node: MfmNode, action: (node: MfmNode) => void): void {

@@ -657,13 +657,7 @@ export function createMfmLanguage(opts: { optimizations: boolean }) {
 		},
 
 		fn: (r) => {
-			const fnName = new P.Parser((input, index, state) => {
-				const result = P.regexp(/[a-z0-9_]+/i).handler(input, index, state);
-				if (!result.success) {
-					return result;
-				}
-				return P.success(result.index, result.value);
-			});
+			const fnName = P.regexp(/[a-z0-9_]+/i);
 			const arg: P.Parser<ArgPair> = P.seq(
 				P.regexp(/[a-z0-9_]+/i),
 				P.seq(P.str('='), P.regexp(/[a-z0-9_.-]+/i))
