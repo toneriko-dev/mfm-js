@@ -289,7 +289,7 @@ interface TypeTable {
 	text: string;
 }
 
-/** optimizations: false は表引きと検索構文の行末判定を使わない文法。差分テストの基準にだけ使う。 */
+/** optimizations: false は表引き・候補の絞り込み・失敗位置の記録・検索構文の行末判定を使わない、差分テスト用の文法。 */
 export function createMfmLanguage(opts: { optimizations: boolean }) {
 	type RuleName = keyof typeof RULE_STARTS;
 	// 最適化なしでは構文を順に試す P.alt。最適化時は先頭文字で候補を絞り、普通の文字の連続は表引きでまとめる。

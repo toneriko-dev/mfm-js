@@ -15,7 +15,7 @@ interface State {
 	linkLabel?: boolean;
 	nestLimit: number;
 	depth: number;
-	/** 本文ループが失敗に行き着いた位置。入力ごと・ループの種類と深さごとに持つ (parser.ts の scanThen)。 */
+	/** 本文ループの失敗位置を入力・ループの種類・深さ・リンクラベル内外ごとに記録する（parser.ts の scanThen）。 */
 	scanFailures?: Map<string, Map<number, Set<number>>>;
 }
 
@@ -244,7 +244,7 @@ export type ParserTable<T> = { [K in keyof T]: Parser<T[K]> };
 
 // 構文規則の相互参照を可能にするため、parser は初回利用時まで遅延初期化する。
 export function createLanguage<T>(syntaxes: { [K in keyof T]: (r: ParserTable<T>) => Parser<T[K]> }): ParserTable<T> {
-	// @ts-expect-error initializing object so type error here
+	// @ts-expect-error 各規則は次のループで設定するため、初期値にはキーがない。
 	const rules: ParserTable<T> = {};
 	for (const key of Object.keys(syntaxes) as (keyof T & string)[]) {
 		rules[key] = lazy(() => {
