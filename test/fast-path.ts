@@ -263,7 +263,7 @@ describe('parser fast paths', () => {
 	});
 
 	// 閉じの無い開き記号を投稿の上限 (8,192 字) まで並べた入力。開始位置ごとに行末や入力末尾まで読み直すと
-	// `[` で 10 秒、`\[` + 改行で数秒かかる。現在は各数 ms なので、上限は負荷の揺れを見込んで広く取る。
+	// 長い時間がかかる。現在は各数 ms なので、上限は負荷の揺れを見込んで広く取る。
 	const repeatTo = (unit: string, tail = '') =>
 		unit.repeat(Math.ceil((8192 - tail.length) / unit.length)).slice(0, 8192 - tail.length) + tail;
 	test.each([

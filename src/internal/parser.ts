@@ -181,7 +181,7 @@ function withPlainTextFastPath<T>(parser: P.Parser<T | string>): P.Parser<T | st
 type StartSet = { chars?: string; emoji?: true; lineBegin?: true; any?: true };
 
 // 表で止まった位置 (構文を始め得る文字と行頭) では、先頭の文字で成立し得ない構文を候補から外し、残りを同じ順序で試す。
-// 数字は絵文字のキーキャップのため表で止まり、全 27 構文を試すと数字の多い文で 1 文字あたり約 1.6µs かかる。
+// 数字は絵文字のキーキャップのため表で止まり、全 27 構文を試すと数字の多い文で遅くなる。
 // P.alt は最初に成功した構文を採るので、外した構文がその文字で必ず失敗する限り出力は変わらない。
 // 候補の組み合わせは数十通りなので、組み合わせごとに parser を共有する。
 function dispatchAlt<T>(entries: readonly (readonly [P.Parser<T>, StartSet])[]): P.Parser<T> {
@@ -299,8 +299,8 @@ export function createMfmLanguage(opts: { optimizations: boolean }) {
 	};
 
 	// 開き記号の後、item を繰り返してから tail (閉じ記号など) を読む構文用。閉じの無い開き記号が 1 行に並ぶと、
-	// 開始位置ごとに本文を行末 (<center> や \\[ では入力末尾) まで読み直して失敗し、長さの 2 乗の時間になる
-	// (`[` 4,000 字で 2.5 秒、`\\[` + 改行 2,000 字で 331 ms)。本文ループのある位置から先の結果は
+	// 開始位置ごとに本文を行末 (<center> や \\[ では入力末尾) まで読み直して失敗し、長さの 2 乗の時間になる。
+	// 本文ループのある位置から先の結果は
 	// 入力・位置・深さ・リンクラベル内かどうかだけで決まり、many は後戻りしないので、失敗した試行が通った位置を覚え、
 	// 後の試行がそこへ来たら読まずに失敗とする。成功した試行の位置は覚えない (外側はその終端より後から再開する)。
 	let scanKinds = 0;
@@ -923,7 +923,7 @@ export function createMfmLanguage(opts: { optimizations: boolean }) {
 					lineStart += 1;
 				}
 				// 行頭でなければ本体の lineBegin で必ず失敗する。行末の判定より先に落とさないと、構文を
-				// 始め得る文字のたびに行の残りを読み直し、長い行で文字数の 2 乗の時間になる (1,088 字で 7.3µs/字)。
+				// 始め得る文字のたびに行の残りを読み直し、長い行で文字数の 2 乗の時間になる。
 				if (lineStart > 0 && input[lineStart - 1] !== '\n' && input[lineStart - 1] !== '\r') {
 					return P.failure();
 				}
