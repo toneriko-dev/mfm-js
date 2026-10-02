@@ -56,7 +56,7 @@ function nest<T>(parser: P.Parser<T>, fallback?: P.Parser<string>): P.Parser<T |
 // 普通の文章では大半の文字がこの経路を通るため、どの構文も始まり得ない UTF-16 コード単位は表引きだけで text とし、
 // 出力は変えない (日本語 189 字で約 560µs → 約 21µs、検索構文の行末判定と合わせた実測)。
 //
-// 先頭文字の根拠 (各構文の最初に消費する parser):
+// 先頭文字の根拠 (各構文の最初に消費する parser) は次のとおり。
 // - 改行 (\r \n): newLine.option() から始まる quote / codeBlock / mathBlock / centerTag / search
 // - < > * _ ` \ ~ $ @ # : ? [: 各構文の開始記号 (quote の > と search は行頭でのみ成立)
 // - h: url (/https?:\/\//)
