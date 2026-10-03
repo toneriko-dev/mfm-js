@@ -9,8 +9,6 @@
 		"removeComments": true,
 		"strict": true,
 		"strictFunctionTypes": true,
-		"strictNullChecks": true,
-		"experimentalDecorators": true,
 		"exactOptionalPropertyTypes": true,
 		"noFallthroughCasesInSwitch": true,
 		"noImplicitReturns": true,
