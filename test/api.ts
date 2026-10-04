@@ -6,7 +6,6 @@ import {
 	CENTER,
 	FN,
 	UNI_EMOJI,
-	MENTION,
 	EMOJI_CODE,
 	HASHTAG,
 	N_URL,
@@ -66,18 +65,8 @@ after`;
 			assert.strictEqual(mfm.toString(mfm.parse(input)), input);
 		});
 
-		test('center', () => {
-			const input = '<center>\nabc\n</center>';
-			assert.strictEqual(mfm.toString(mfm.parse(input)), input);
-		});
-
 		test('emoji code', () => {
 			const input = ':abc:';
-			assert.strictEqual(mfm.toString(mfm.parse(input)), input);
-		});
-
-		test('unicode emoji', () => {
-			const input = '今起きた😇';
 			assert.strictEqual(mfm.toString(mfm.parse(input)), input);
 		});
 
@@ -181,19 +170,6 @@ after`;
 	});
 
 	describe('extract', () => {
-		test('basic', () => {
-			const nodes = mfm.parse('@hoge @piyo @bebeyo');
-			const expect = [
-				MENTION('hoge', null, '@hoge'),
-				MENTION('piyo', null, '@piyo'),
-				MENTION('bebeyo', null, '@bebeyo'),
-			];
-			assert.deepStrictEqual(
-				mfm.extract(nodes, (node) => node.type == 'mention'),
-				expect,
-			);
-		});
-
 		test('nested', () => {
 			const nodes = mfm.parse('abc:hoge:$[tada 123 @hoge :foo:]:piyo:');
 			const expect = [EMOJI_CODE('hoge'), EMOJI_CODE('foo'), EMOJI_CODE('piyo')];

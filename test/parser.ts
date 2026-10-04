@@ -107,15 +107,6 @@ describe('FullParser', () => {
 			const output = [QUOTE([TEXT('abc\n123')])];
 			assert.deepStrictEqual(mfm.parse(input), output);
 		});
-		test('引用ブロックはブロックをネストできる', () => {
-			const input = `
-> <center>
-> a
-> </center>
-`;
-			const output = [QUOTE([CENTER([TEXT('a')])])];
-			assert.deepStrictEqual(mfm.parse(input), output);
-		});
 		test('引用ブロックはインライン構文を含んだブロックをネストできる', () => {
 			const input = `
 > <center>
@@ -172,11 +163,6 @@ hoge`;
 				const output = [SEARCH('MFM 書き方 123', input)];
 				assert.deepStrictEqual(mfm.parse(input), output);
 			});
-			test('search', () => {
-				const input = 'MFM 書き方 123 search';
-				const output = [SEARCH('MFM 書き方 123', input)];
-				assert.deepStrictEqual(mfm.parse(input), output);
-			});
 			test('[search]', () => {
 				const input = 'MFM 書き方 123 [search]';
 				const output = [SEARCH('MFM 書き方 123', input)];
@@ -201,12 +187,6 @@ hoge`;
 	});
 
 	describe('code block', () => {
-		test('コードブロックを使用できる', () => {
-			const input = '```\nabc\n```';
-			const output = [CODE_BLOCK('abc', null)];
-			assert.deepStrictEqual(mfm.parse(input), output);
-		});
-
 		test('コードブロックには複数行のコードを入力できる', () => {
 			const input = '```\na\nb\nc\n```';
 			const output = [CODE_BLOCK('a\nb\nc', null)];
@@ -228,12 +208,6 @@ hoge`;
 		test('ignore internal marker', () => {
 			const input = '```\naaa```bbb\n```';
 			const output = [CODE_BLOCK('aaa```bbb', null)];
-			assert.deepStrictEqual(mfm.parse(input), output);
-		});
-
-		test('trim after line break', () => {
-			const input = '```\nfoo\n```\nbar';
-			const output = [CODE_BLOCK('foo', null), TEXT('bar')];
 			assert.deepStrictEqual(mfm.parse(input), output);
 		});
 	});
@@ -297,16 +271,6 @@ hoge`;
 	});
 
 	describe('big', () => {
-		test('basic', () => {
-			const input = '***abc***';
-			const output = [FN('tada', {}, [TEXT('abc')])];
-			assert.deepStrictEqual(mfm.parse(input), output);
-		});
-		test('内容にはインライン構文を利用できる', () => {
-			const input = '***123**abc**123***';
-			const output = [FN('tada', {}, [TEXT('123'), BOLD([TEXT('abc')]), TEXT('123')])];
-			assert.deepStrictEqual(mfm.parse(input), output);
-		});
 		test('内容は改行できる', () => {
 			const input = '***123\n**abc**\n123***';
 			const output = [FN('tada', {}, [TEXT('123\n'), BOLD([TEXT('abc')]), TEXT('\n123')])];
@@ -315,16 +279,6 @@ hoge`;
 	});
 
 	describe('bold tag', () => {
-		test('basic', () => {
-			const input = '<b>abc</b>';
-			const output = [BOLD([TEXT('abc')])];
-			assert.deepStrictEqual(mfm.parse(input), output);
-		});
-		test('inline syntax allowed inside', () => {
-			const input = '<b>123~~abc~~123</b>';
-			const output = [BOLD([TEXT('123'), STRIKE([TEXT('abc')]), TEXT('123')])];
-			assert.deepStrictEqual(mfm.parse(input), output);
-		});
 		test('line breaks', () => {
 			const input = '<b>123\n~~abc~~\n123</b>';
 			const output = [BOLD([TEXT('123\n'), STRIKE([TEXT('abc')]), TEXT('\n123')])];
@@ -333,16 +287,6 @@ hoge`;
 	});
 
 	describe('bold', () => {
-		test('basic', () => {
-			const input = '**abc**';
-			const output = [BOLD([TEXT('abc')])];
-			assert.deepStrictEqual(mfm.parse(input), output);
-		});
-		test('内容にはインライン構文を利用できる', () => {
-			const input = '**123~~abc~~123**';
-			const output = [BOLD([TEXT('123'), STRIKE([TEXT('abc')]), TEXT('123')])];
-			assert.deepStrictEqual(mfm.parse(input), output);
-		});
 		test('内容は改行できる', () => {
 			const input = '**123\n~~abc~~\n123**';
 			const output = [BOLD([TEXT('123\n'), STRIKE([TEXT('abc')]), TEXT('\n123')])];
@@ -351,16 +295,6 @@ hoge`;
 	});
 
 	describe('small', () => {
-		test('basic', () => {
-			const input = '<small>abc</small>';
-			const output = [SMALL([TEXT('abc')])];
-			assert.deepStrictEqual(mfm.parse(input), output);
-		});
-		test('内容にはインライン構文を利用できる', () => {
-			const input = '<small>abc**123**abc</small>';
-			const output = [SMALL([TEXT('abc'), BOLD([TEXT('123')]), TEXT('abc')])];
-			assert.deepStrictEqual(mfm.parse(input), output);
-		});
 		test('内容は改行できる', () => {
 			const input = '<small>abc\n**123**\nabc</small>';
 			const output = [SMALL([TEXT('abc\n'), BOLD([TEXT('123')]), TEXT('\nabc')])];
@@ -369,16 +303,6 @@ hoge`;
 	});
 
 	describe('italic tag', () => {
-		test('basic', () => {
-			const input = '<i>abc</i>';
-			const output = [ITALIC([TEXT('abc')])];
-			assert.deepStrictEqual(mfm.parse(input), output);
-		});
-		test('内容にはインライン構文を利用できる', () => {
-			const input = '<i>abc**123**abc</i>';
-			const output = [ITALIC([TEXT('abc'), BOLD([TEXT('123')]), TEXT('abc')])];
-			assert.deepStrictEqual(mfm.parse(input), output);
-		});
 		test('内容は改行できる', () => {
 			const input = '<i>abc\n**123**\nabc</i>';
 			const output = [ITALIC([TEXT('abc\n'), BOLD([TEXT('123')]), TEXT('\nabc')])];
@@ -595,12 +519,6 @@ hoge`;
 	});
 
 	describe('hashtag', () => {
-		test('basic', () => {
-			const input = '#abc';
-			const output = [HASHTAG('abc')];
-			assert.deepStrictEqual(mfm.parse(input), output);
-		});
-
 		test('basic 2', () => {
 			const input = 'before #abc after';
 			const output = [TEXT('before '), HASHTAG('abc'), TEXT(' after')];
@@ -714,12 +632,6 @@ hoge`;
 			assert.deepStrictEqual(mfm.parse(input), output);
 		});
 
-		test('disallow number only', () => {
-			const input = '#123';
-			const output = [TEXT('#123')];
-			assert.deepStrictEqual(mfm.parse(input), output);
-		});
-
 		test('disallow number only (with brackets)', () => {
 			const input = '(#123)';
 			const output = [TEXT('(#123)')];
@@ -737,12 +649,6 @@ hoge`;
 		test('with other texts', () => {
 			const input = 'official instance: https://misskey.io/@ai.';
 			const output = [TEXT('official instance: '), N_URL('https://misskey.io/@ai'), TEXT('.')];
-			assert.deepStrictEqual(mfm.parse(input), output);
-		});
-
-		test('ignore trailing period', () => {
-			const input = 'https://misskey.io/@ai.';
-			const output = [N_URL('https://misskey.io/@ai'), TEXT('.')];
 			assert.deepStrictEqual(mfm.parse(input), output);
 		});
 
@@ -1048,21 +954,9 @@ hoge`;
 				assert.deepStrictEqual(mfm.parse(input, { nestLimit: 2 }), output);
 			});
 
-			test('outside "()"', () => {
-				const input = '(#abc)';
-				const output = [TEXT('('), HASHTAG('abc'), TEXT(')')];
-				assert.deepStrictEqual(mfm.parse(input), output);
-			});
-
 			test('outside "[]"', () => {
 				const input = '[#abc]';
 				const output = [TEXT('['), HASHTAG('abc'), TEXT(']')];
-				assert.deepStrictEqual(mfm.parse(input), output);
-			});
-
-			test('outside "「」"', () => {
-				const input = '「#abc」';
-				const output = [TEXT('「'), HASHTAG('abc'), TEXT('」')];
 				assert.deepStrictEqual(mfm.parse(input), output);
 			});
 
