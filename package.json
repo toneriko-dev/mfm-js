@@ -1,7 +1,7 @@
 {
 	"type": "module",
 	"name": "mfm-js",
-	"version": "0.26.0",
+	"version": "0.26.1",
 	"description": "MFM parser implementation (Misskey fork)",
 	"author": "Marihachi",
 	"license": "MIT",
