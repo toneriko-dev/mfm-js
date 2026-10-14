@@ -287,6 +287,32 @@ describe('parser matches the reference grammar', () => {
 		expect(performance.now() - start).toBeLessThan(250);
 	});
 
+	// 閉じないコードブロックの開きが行ごとに並ぶ入力と、閉じない $[ がリンクのラベルの内外で入れ子の上限まで重なる入力。
+	// 閉じの位置を開きごとに末尾まで探すと長さの 2 乗になる。上と同じく 32,768 字で確かめる。
+	// 同じ内容の長い引用が 2 つ並ぶ。2 つ目の中身は別に作られた同じ内容の文字列なので、記録 (行末・リンクの失敗位置) を
+	// 文字列で引くたびに全文を比べると長さの 2 乗になる。
+	test('two long quotes with the same content parse in linear time', () => {
+		const quote = '> [a\n'.repeat(32768);
+		const start = performance.now();
+		full(quote + '\nx\n' + quote, 20);
+		expect(performance.now() - start).toBeLessThan(250);
+	});
+
+	// \r を含む入力で、入れ子の上限の手前の ~~ が並ぶ。~~ ごとに行末を探し直すと長さの 2 乗になる。
+	test('strikes at the nest limit in an input with CR parse in linear time', () => {
+		const input = '<b>'.repeat(19) + '~~a~~'.repeat(13100) + '\r' + '</b>'.repeat(19);
+		const start = performance.now();
+		full(input, 20);
+		expect(performance.now() - start).toBeLessThan(250);
+	});
+
+	test.each(['\n```a', '#$[x 」', '$[f.a #'])('%j repeated up to 32,768 chars parses in linear time', (unit) => {
+		const input = unit.repeat(Math.ceil(32768 / unit.length)).slice(0, 32768);
+		const start = performance.now();
+		full(input, 20);
+		expect(performance.now() - start).toBeLessThan(250);
+	});
+
 	test('simple parser output matches', () => {
 		fc.assert(
 			fc.property(fc.oneof(mfmText, rawUnits), (input) => {

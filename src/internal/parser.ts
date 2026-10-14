@@ -107,11 +107,47 @@ let L = 0;
 let depth = 0;
 let nestLimit = 20;
 let linkLabel = false;
-/** 本文ループの失敗位置。入力の文字列ごとに、ループの種類・深さ・リンクラベル内外で分ける (scanFailed)。 */
-let failures: Map<string, Map<number, Set<number>>> | null = null;
 let out: Value = '';
-/** S を替えるたびに進める。S ごとの値を使い回す箇所 (lineEndFrom) が、替わったことを知るために使う。 */
-let generation = 0;
+
+/**
+ * 入力の文字列ごとの記録。failures は本文ループの失敗位置 (scanFailed)、lf / cr / founds は先の位置の検索結果 (findFrom)。
+ * 行末は行頭ごとに引くので、改行 2 つは Map を通さずに持つ。
+ */
+type InputRecords = {
+	failures: Map<number, Set<number>> | null;
+	lf: Found;
+	cr: Found;
+	founds: Map<string, Found> | null;
+};
+const newRecords = (): InputRecords => ({ failures: null, lf: { from: 0, at: -1 }, cr: { from: 0, at: -1 }, founds: null });
+/**
+ * 引用の中身の記録。同じ内容の引用は同じ記録を使う。文字列をキーに引くと、別に作られた同じ内容の文字列とは
+ * 全文を比べることになるので、引くのは引用に入るときだけにし、それ以外は current を使う。
+ */
+let quoteRecords: Map<string, InputRecords> | null = null;
+/** 今の S の記録。最上位の入力では、初めて使うときに作る。 */
+let current: InputRecords | null = null;
+
+function setInput(input: string, inputRecords: InputRecords | null): void {
+	S = input;
+	L = input.length;
+	current = inputRecords;
+}
+
+function currentRecords(): InputRecords {
+	current ??= newRecords();
+	return current;
+}
+
+function recordsOfQuote(content: string): InputRecords {
+	quoteRecords ??= new Map();
+	let inputRecords = quoteRecords.get(content);
+	if (inputRecords == null) {
+		inputRecords = newRecords();
+		quoteRecords.set(content, inputRecords);
+	}
+	return inputRecords;
+}
 
 /**
  * 本文ループで読んだ結果を、隣り合う text を結合しながら積む。
@@ -208,20 +244,16 @@ function scanSlot(kind: number): number {
 
 /** 記録した失敗位置。たいていの入力は一度も失敗を記録しないので、記録するまで入れ物を作らず undefined を返す。 */
 function scanFailed(slot: number): Set<number> | undefined {
-	return failures?.get(S)?.get(slot);
+	return currentRecords().failures?.get(slot);
 }
 
 function scanFailedForWrite(slot: number): Set<number> {
-	failures ??= new Map();
-	let byInput = failures.get(S);
-	if (byInput == null) {
-		byInput = new Map();
-		failures.set(S, byInput);
-	}
-	let failed = byInput.get(slot);
+	const inputRecords = currentRecords();
+	inputRecords.failures ??= new Map();
+	let failed = inputRecords.failures.get(slot);
 	if (failed == null) {
 		failed = new Set();
-		byInput.set(slot, failed);
+		inputRecords.failures.set(slot, failed);
 	}
 	return failed;
 }
@@ -262,6 +294,39 @@ function markVisitedFailed(slot: number, visited: readonly number[]): number {
 		failed.add(p);
 	}
 	return -1;
+}
+
+// ---- 先の位置の検索 ----
+// 行末や閉じ記号を問い合わせのたびに探すと、閉じの無い開き記号や行が並ぶ入力で、同じ範囲を何度も末尾まで読むことになる。
+// 文字列ごと・探すものごとに「[from, at) には無く at にある (無ければ入力末尾)」を覚え、その範囲からの問い合わせに使い回す。
+// 引用の中身は別の文字列で、同じ内容の引用は同じ記録を共有するので、問い合わせの位置は前後し得る。
+type Found = { from: number; at: number };
+
+/** q 以降で最初に key が現れる位置 (無ければ L)。find を渡すと、key は名前として使い find で探す。 */
+function findFrom(key: string, q: number, find?: (q: number) => number): number {
+	const inputRecords = currentRecords();
+	inputRecords.founds ??= new Map();
+	let found = inputRecords.founds.get(key);
+	if (found == null) {
+		found = { from: 0, at: -1 };
+		inputRecords.founds.set(key, found);
+	}
+	return findWith(found, q, key, find);
+}
+
+/** found が q を含む範囲を覚えていればそれを、無ければ探して覚え直した位置を返す。find が無ければ needle を探す。 */
+function findWith(found: Found, q: number, needle: string, find?: (q: number) => number): number {
+	if (found.from <= q && q <= found.at) return found.at;
+	let at: number;
+	if (find != null) {
+		at = find(q);
+	} else {
+		at = S.indexOf(needle, q);
+		if (at < 0) at = L;
+	}
+	found.from = q;
+	found.at = at;
+	return at;
 }
 
 /** 入れ子の上限内なら inline を、超えたら 1 文字を読む。 */
@@ -397,6 +462,15 @@ function wrap(i: number, open: string, close: string, node: (children: M.MfmInli
 	const bodyStart = i + open.length;
 	const acc = new Acc();
 	let p = bodyStart;
+	// 入れ子の上限の手前では中身を 1 文字ずつ読むので、閉じ記号 (~~ は改行も) の手前まで一度に進める
+	if (depth + 1 >= nestLimit && p < L) {
+		let end = findFrom(close, p);
+		if (stopAtNewLine) end = Math.min(end, lineEndFrom(p));
+		if (end > p) {
+			acc.push(p, end, '');
+			p = end;
+		}
+	}
 	while (p < L) {
 		if (S.startsWith(close, p) || (stopAtNewLine && newLine(p) > 0)) break;
 		const from = p;
@@ -459,9 +533,9 @@ function quote(i: number): number {
 	if (lines.length === 1 && lines[0] === '') return -1;
 	// 中身は > を除いた行をつないだ別の文字列として、同じ深さ・上限で読み直す。上限を超えたら全て text
 	const outer = S;
-	S = lines.join('\n');
-	L = S.length;
-	generation++;
+	const outerRecords = current;
+	const content = lines.join('\n');
+	setInput(content, recordsOfQuote(content));
 	const acc = new Acc();
 	depth++;
 	if (depth < nestLimit) {
@@ -476,9 +550,7 @@ function quote(i: number): number {
 	}
 	depth--;
 	const children = acc.done();
-	S = outer;
-	L = outer.length;
-	generation++;
+	setInput(outer, outerRecords);
 	out = M.QUOTE(children);
 	return p;
 }
@@ -499,6 +571,12 @@ function codeBlockCloseAt(p: number): boolean {
 	return n > 0 && S.startsWith('```', p + n) && lineEnd(p + n + 3);
 }
 
+function codeBlockCloseFrom(q: number): number {
+	let p = q;
+	while (p < L && !codeBlockCloseAt(p)) p++;
+	return p;
+}
+
 function codeBlock(i: number): number {
 	let q = i + newLine(i);
 	if (!lineBegin(q) || !S.startsWith('```', q)) return -1;
@@ -510,8 +588,7 @@ function codeBlock(i: number): number {
 	if (n === 0) return -1;
 	q += n;
 	const codeStart = q;
-	let p = q;
-	while (p < L && !codeBlockCloseAt(p)) p++;
+	const p = findFrom('codeBlockClose', q, codeBlockCloseFrom);
 	if (p === codeStart || p >= L) return -1;
 	let end = p + newLine(p) + 3;
 	end += newLine(end);
@@ -683,6 +760,14 @@ function fn(i: number): number {
 	p++;
 	const bodyStart = p;
 	const acc = new Acc();
+	// 入れ子の上限の手前では中身を 1 文字ずつ読むので、] の手前まで一度に進める
+	if (depth + 1 >= nestLimit && p < L) {
+		const end = findFrom(']', p);
+		if (end > p) {
+			acc.push(p, end, '');
+			p = end;
+		}
+	}
 	while (p < L && S.charCodeAt(p) !== CLOSE_BRACKET) {
 		const from = p;
 		p = nestInline(p);
@@ -982,37 +1067,10 @@ function isSearchWord(p: number): boolean {
 	return true;
 }
 
-// 行末を探すための、入力の文字列ごとの情報。\r を含まない入力では、[from, nextLF) に \n が無く nextLF が \n
-// (無ければ入力末尾) であることを覚え、その範囲の位置からの問い合わせに使い回す。
-// 引用の中身から外側へ戻るたびに作り直すと、引用と普通の行が交互に並ぶ入力で全体を何度も読むので、文字列ごとに持つ。
-// 同じ内容の引用は同じ情報を使うため、問い合わせの位置は前後し得る。
-type LineInfo = { hasCR: boolean; from: number; nextLF: number };
-let lineInfos: Map<string, LineInfo> | null = null;
-let lineInfo: LineInfo | null = null;
-let lineInfoGeneration = -1;
-
+/** q 以降で最初の改行 (\r か \n) の位置。無ければ L。 */
 function lineEndFrom(q: number): number {
-	if (lineInfoGeneration !== generation) {
-		lineInfoGeneration = generation;
-		lineInfos ??= new Map();
-		lineInfo = lineInfos.get(S) ?? null;
-		if (lineInfo == null) {
-			lineInfo = { hasCR: S.includes('\r'), from: 0, nextLF: -1 };
-			lineInfos.set(S, lineInfo);
-		}
-	}
-	const info = lineInfo as LineInfo;
-	if (info.hasCR) {
-		let p = q;
-		while (p < L && newLine(p) === 0) p++;
-		return p;
-	}
-	if (q < info.from || q > info.nextLF) {
-		const next = S.indexOf('\n', q);
-		info.from = q;
-		info.nextLF = next < 0 ? L : next;
-	}
-	return info.nextLF;
+	const inputRecords = currentRecords();
+	return Math.min(findWith(inputRecords.lf, q, '\n'), findWith(inputRecords.cr, q, '\r'));
 }
 
 /** 行 [start, end) が「空白 検索ボタン」で終わるか。検索構文が成立する行の必要条件。 */
@@ -1056,14 +1114,11 @@ function search(i: number): number {
 
 // ---- 公開 ----
 function run(input: string, limit: number, read: (i: number) => number): M.MfmNode[] {
-	S = input;
-	L = input.length;
-	generation++;
+	quoteRecords = null;
+	setInput(input, null);
 	depth = 0;
 	nestLimit = limit;
 	linkLabel = false;
-	failures = null;
-	lineInfos = null;
 	try {
 		const acc = new Acc();
 		let i = 0;
@@ -1074,12 +1129,9 @@ function run(input: string, limit: number, read: (i: number) => number): M.MfmNo
 		}
 		return acc.done();
 	} finally {
-		// 入力と失敗位置の記録を次の parse まで持ち続けない
-		S = '';
-		L = 0;
-		failures = null;
-		lineInfos = null;
-		lineInfo = null;
+		// 入力と記録を次の parse まで持ち続けない
+		quoteRecords = null;
+		setInput('', null);
 		out = '';
 	}
 }
