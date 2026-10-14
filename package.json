@@ -15,8 +15,8 @@
 		}
 	},
 	"scripts": {
-		"build": "bun ./build.js",
-		"watch": "bun ./build.js --watch",
+		"build": "tsdown",
+		"watch": "tsdown --watch",
 		"typecheck": "bun check",
 		"lint": "bun run --bun typecheck",
 		"test": "vitest run"
@@ -25,10 +25,9 @@
 		"@misskey-dev/emoji-data": "17.0.6"
 	},
 	"devDependencies": {
-		"@microsoft/api-extractor": "7.59.3",
 		"@types/node": "26.6.4",
-		"esbuild": "0.28.2",
 		"fast-check": "4.10.2",
+		"tsdown": "0.23.0",
 		"typescript": "7.0.2",
 		"vitest": "5.0.3"
 	},
