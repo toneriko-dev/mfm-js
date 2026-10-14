@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { Parser, success } from '../src/internal/core/index.js';
+import { Parser, success } from './reference/core';
 
 describe('Parser combinators', () => {
 	describe('many', () => {

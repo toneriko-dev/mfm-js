@@ -1,31 +1,14 @@
 import type * as M from '../node';
-import { language } from './parser';
-import { mergeText } from './util';
+import { parseFull, parseSimple } from './parser';
 
 export type FullParserOpts = {
 	nestLimit?: number;
 };
 
 export function fullParser(input: string, opts: FullParserOpts): M.MfmNode[] {
-	const result = language.fullParser.handler(input, 0, {
-		nestLimit: opts.nestLimit != null ? opts.nestLimit : 20,
-		depth: 0,
-		linkLabel: false,
-		trace: false,
-	});
-	if (!result.success) {
-		throw new Error('Unexpected parse error');
-	}
-	return mergeText(result.value);
+	return parseFull(input, opts.nestLimit != null ? opts.nestLimit : 20);
 }
 
 export function simpleParser(input: string): M.MfmSimpleNode[] {
-	const result = language.simpleParser.handler(input, 0, {
-		depth: 0,
-		nestLimit: 1 / 0, // 入れ子の深さを制限しない
-	});
-	if (!result.success) {
-		throw new Error('Unexpected parse error');
-	}
-	return mergeText(result.value);
+	return parseSimple(input);
 }

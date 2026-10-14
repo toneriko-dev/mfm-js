@@ -1,30 +1,24 @@
 import { describe, expect, test } from 'vitest';
 import fc from 'fast-check';
-import { createMfmLanguage } from '../src/internal/parser';
-import { mergeText } from '../src/internal/util';
+import * as mfm from '../src/index';
+import { language as reference } from './reference/parser';
+import { mergeText } from './reference/util';
 
-// 表引きで text を先に返す経路・検索構文の行末判定と、全構文を順に試す最適化なしの文法とで出力が一致することを確かめる。
-const reference = createMfmLanguage({ optimizations: false });
-const optimized = createMfmLanguage({ optimizations: true });
+// src/internal/parser.ts と、同じ文法を parser combinator でそのまま書いた参照実装 (test/reference/) とで出力が一致することを確かめる。
 
-type Language = ReturnType<typeof createMfmLanguage>;
-
-function full(language: Language, input: string, nestLimit: number) {
-	const result = language.fullParser.handler(input, 0, { nestLimit, depth: 0, linkLabel: false, trace: false });
+function referenceFull(input: string, nestLimit: number) {
+	const result = reference.fullParser.handler(input, 0, { nestLimit, depth: 0, linkLabel: false, trace: false });
 	if (!result.success) throw new Error('parse failed');
 	return mergeText(result.value);
 }
 
-function simple(language: Language, input: string) {
-	const result = language.simpleParser.handler(input, 0, {
-		nestLimit: 1 / 0,
-		depth: 0,
-		linkLabel: false,
-		trace: false,
-	});
+function referenceSimple(input: string) {
+	const result = reference.simpleParser.handler(input, 0, { nestLimit: 1 / 0, depth: 0, linkLabel: false, trace: false });
 	if (!result.success) throw new Error('parse failed');
 	return mergeText(result.value);
 }
+
+const full = (input: string, nestLimit: number) => mfm.parse(input, { nestLimit });
 
 // 構文の開始・終了記号、行頭でだけ成立する構文、表で普通の文字とする ] や文字種の境界を混ぜる。
 const fragments = [
@@ -173,7 +167,7 @@ const mfmText = fc
 
 const rawUnits = fc.string({ unit: 'binary', maxLength: 30 });
 
-// 閉じの無い開き記号が並ぶ入力。本文ループの失敗位置の記憶が、深さ・リンクラベル内外・入力の違いをまたいで
+// 閉じの無い開き記号が並ぶ入力。本文ループの失敗位置の記録が、深さ・リンクラベル内外・入力の違いをまたいで
 // 誤って効かないことを確かめる (引用は中身を別の文字列として読み直す)。
 const openerText = fc
 	.array(
@@ -215,11 +209,11 @@ const openerText = fc
 // 失敗時の最小化は長くかかるので行わない。反例は最初に見つかった入力をそのまま表示する。
 fc.configureGlobal({ endOnFailure: true });
 
-describe('parser fast paths', () => {
-	test('full parser output matches the reference grammar', () => {
+describe('parser matches the reference grammar', () => {
+	test('full parser output matches on MFM fragments', () => {
 		fc.assert(
 			fc.property(mfmText, fc.integer({ min: 0, max: 4 }), (input, nestLimit) => {
-				expect(full(optimized, input, nestLimit)).toEqual(full(reference, input, nestLimit));
+				expect(full(input, nestLimit)).toStrictEqual(referenceFull(input, nestLimit));
 			}),
 			{ numRuns: 20000 },
 		);
@@ -228,7 +222,7 @@ describe('parser fast paths', () => {
 	test('full parser output matches on arbitrary UTF-16 code units', () => {
 		fc.assert(
 			fc.property(rawUnits, (input) => {
-				expect(full(optimized, input, 20)).toEqual(full(reference, input, 20));
+				expect(full(input, 20)).toStrictEqual(referenceFull(input, 20));
 			}),
 			{ numRuns: 5000 },
 		);
@@ -237,7 +231,7 @@ describe('parser fast paths', () => {
 	test('full parser output matches on runs of unclosed openers', () => {
 		fc.assert(
 			fc.property(openerText, fc.integer({ min: 0, max: 4 }), (input, nestLimit) => {
-				expect(full(optimized, input, nestLimit)).toEqual(full(reference, input, nestLimit));
+				expect(full(input, nestLimit)).toStrictEqual(referenceFull(input, nestLimit));
 			}),
 			{ numRuns: 20000 },
 		);
@@ -247,16 +241,16 @@ describe('parser fast paths', () => {
 	// 深さ 0 ではインラインコードが `]` を含めて読むのでリンクになる。失敗の記憶を深さで分けないと後者も失敗する。
 	test('a label that fails at the nest limit is retried at a shallower depth', () => {
 		const input = '<center>\n[`]`](https://x.y)\n</center>x';
-		expect(full(optimized, input, 2)).toEqual(full(reference, input, 2));
-		expect(full(optimized, input, 2)).toContainEqual(expect.objectContaining({ type: 'link' }));
+		expect(full(input, 2)).toStrictEqual(referenceFull(input, 2));
+		expect(full(input, 2)).toContainEqual(expect.objectContaining({ type: 'link' }));
 	});
 
 	// 先頭の `[` をリンクとして読む試行が `](<https://>` の空の URL で失敗した後、深さ 0 の `<https://](<https://>` が
 	// 同じ `>` の位置に本文 1 字以上で来る。件数不足の失敗を位置で覚えると、こちらも URL にならない。
 	test('an empty bracketed URL does not fail a later non-empty one ending at the same position', () => {
 		const input = '[(https://x.y)<https://](<https://>';
-		expect(full(optimized, input, 0)).toEqual(full(reference, input, 0));
-		expect(full(optimized, input, 0)).toContainEqual({
+		expect(full(input, 0)).toStrictEqual(referenceFull(input, 0));
+		expect(full(input, 0)).toContainEqual({
 			type: 'url',
 			props: { url: 'https://](<https://', brackets: true },
 		});
@@ -280,14 +274,23 @@ describe('parser fast paths', () => {
 		repeatTo('[', '](http://.)'),
 	])('%# unclosed openers up to 8,192 chars parse in linear time', (input) => {
 		const start = performance.now();
-		full(optimized, input, 20);
+		full(input, 20);
 		expect(performance.now() - start).toBeLessThan(250);
 	});
 
-	test('simple parser output matches the reference grammar', () => {
+	// 閉じ記号は見つかるがその後が行末でない失敗も覚える。8,192 字では覚えなくても 250 ms に収まるので、
+	// 長さの 2 乗との差が開くよう、その 4 倍の長さで確かめる。
+	test('openers whose closer is not at a line end parse in linear time', () => {
+		const input = '\\[\n'.repeat(10922) + '\\]x';
+		const start = performance.now();
+		full(input, 20);
+		expect(performance.now() - start).toBeLessThan(250);
+	});
+
+	test('simple parser output matches', () => {
 		fc.assert(
 			fc.property(fc.oneof(mfmText, rawUnits), (input) => {
-				expect(simple(optimized, input)).toEqual(simple(reference, input));
+				expect(mfm.parseSimple(input)).toStrictEqual(referenceSimple(input));
 			}),
 			{ numRuns: 10000 },
 		);
@@ -307,8 +310,15 @@ describe('parser fast paths', () => {
 			'x\r\nquery text [search]\ny',
 			'x\n> quote',
 			'x\n```\ncode\n```',
+			// 同じ内容の引用は行末の情報を共有する。2 つ目の引用を先頭から読み直しても検索構文になる
+			'> a 検索\n> b\n\nc\n> a 検索\n> b',
+			// 全角の括弧は、ハッシュタグでは対で読むが URL では読まない
+			'https://a.b/（c）d',
+			'https://a.b/「c」d',
+			'#タグ（a）b',
+			'#t「a」b',
 		]) {
-			expect(full(optimized, input, 20)).toEqual(full(reference, input, 20));
+			expect(full(input, 20)).toStrictEqual(referenceFull(input, 20));
 		}
 	});
 });
