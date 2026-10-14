@@ -29,9 +29,14 @@
 		"@types/node": "26.6.4",
 		"esbuild": "0.28.2",
 		"fast-check": "4.10.2",
+		"typescript": "7.0.2",
 		"vitest": "5.0.3"
 	},
 	"files": [
 		"built"
-	]
+	],
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/toneriko-dev/mfm-js.git"
+	}
 }
